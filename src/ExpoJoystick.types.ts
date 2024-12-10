@@ -11,10 +11,11 @@ export type MotionEventPayload2 = {
 }
 
 export type MotionEventPayload = {
-  left: number[];
-  right: number[];
-  triggers: number[];
-  dpad: number[];
+  LEFT: number[];
+  RIGHT: number[];
+  TRIGGER_L: number;
+  TRIGGER_R: number;
+  DPAD: number[];
 }
 
 export type KeyEventPayload = {

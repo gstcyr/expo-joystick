@@ -153,7 +153,8 @@ class ExpoJoystickModule : Module() {
         Log.d("JOYSTICK", "handleKeyEvent: "+event)
 
         if (event.source and InputDevice.SOURCE_GAMEPAD == InputDevice.SOURCE_GAMEPAD ||
-                event.source and InputDevice.SOURCE_JOYSTICK == InputDevice.SOURCE_JOYSTICK) {
+                event.source and InputDevice.SOURCE_JOYSTICK == InputDevice.SOURCE_JOYSTICK ||
+                event.source and InputDevice.SOURCE_KEYBOARD == InputDevice.SOURCE_KEYBOARD) {
 
             val params = mapOf(
                     "action" to getIntConstantName(KeyEvent::class.java, event.action),

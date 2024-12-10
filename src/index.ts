@@ -18,10 +18,11 @@ export function onButtonPress(listener: (event: KeyEventPayload) => void): Subsc
 export function onJoyStick(listener: (event: MotionEventPayload) => void): Subscription {
   return emitter.addListener('onJoyStick', (event: MotionEventPayload2) => {
     listener({
-            left: [event.AXIS_X, event.AXIS_Y],
-            right: [event.AXIS_Z, event.AXIS_RZ],
-            dpad: [event.AXIS_HAT_X, event.AXIS_HAT_Y],
-            triggers: [event.AXIS_RX, event.AXIS_RY]
+            LEFT: [event.AXIS_X, event.AXIS_Y],
+            RIGHT: [event.AXIS_Z, event.AXIS_RZ],
+            DPAD: [event.AXIS_HAT_X, event.AXIS_HAT_Y],
+            TRIGGER_L: event.AXIS_RX,
+            TRIGGER_R: event.AXIS_RY
         });
   })
 }
