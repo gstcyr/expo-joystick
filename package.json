@@ -1,6 +1,6 @@
 {
   "name": "expo-joystick",
-  "version": "0.1.0",
+  "version": "1.0.0",
   "description": "HID Joystick support",
   "main": "build/index.js",
   "types": "build/index.d.ts",
@@ -9,8 +9,7 @@
     "clean": "expo-module clean",
     "lint": "expo-module lint",
     "test": "expo-module test",
-    "prepare_orig": "expo-module prepare",
-    "prepare": "tsc",
+    "prepare": "expo-module prepare",
     "prepublishOnly": "expo-module prepublishOnly",
     "expo-module": "expo-module",
     "open:ios": "xed example/ios",
