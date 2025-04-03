@@ -114,8 +114,12 @@ class ExpoJoystickModule : Module() {
         // Override the window callback to capture key events
         activity.window.callback = object : android.view.Window.Callback by originalCallback!! {
             override fun dispatchKeyEvent(event: KeyEvent): Boolean {
-                return handleKeyEvent(event)
-                //return originalCallback?.dispatchKeyEvent(event) ?: false
+                var handled = handleKeyEvent(event)
+                return if (handled) {
+                    true
+                } else {
+                    originalCallback?.dispatchKeyEvent(event) ?: false // let the system handle it
+                }
             }
         }
 
@@ -150,12 +154,23 @@ class ExpoJoystickModule : Module() {
     }
 
     fun handleKeyEvent(event: KeyEvent) : Boolean {
-        Log.d("JOYSTICK", "handleKeyEvent: "+event)
+        val validKeyCodes = listOf(
+                KeyEvent.KEYCODE_F1, KeyEvent.KEYCODE_F2, KeyEvent.KEYCODE_F3, KeyEvent.KEYCODE_F4,
+                KeyEvent.KEYCODE_F5, KeyEvent.KEYCODE_F6, KeyEvent.KEYCODE_F7, KeyEvent.KEYCODE_F8,
+                KeyEvent.KEYCODE_F9, KeyEvent.KEYCODE_F10, KeyEvent.KEYCODE_Z,
+                KeyEvent.KEYCODE_BUTTON_A, KeyEvent.KEYCODE_BUTTON_B, KeyEvent.KEYCODE_BUTTON_Z,
+                KeyEvent.KEYCODE_BUTTON_R1, KeyEvent.KEYCODE_BUTTON_L1, KeyEvent.KEYCODE_BUTTON_THUMBL,
+                KeyEvent.KEYCODE_BUTTON_R2, KeyEvent.KEYCODE_BUTTON_L2, KeyEvent.KEYCODE_BACK
+        )
 
         if (event.source and InputDevice.SOURCE_GAMEPAD == InputDevice.SOURCE_GAMEPAD ||
                 event.source and InputDevice.SOURCE_JOYSTICK == InputDevice.SOURCE_JOYSTICK ||
                 event.source and InputDevice.SOURCE_KEYBOARD == InputDevice.SOURCE_KEYBOARD) {
 
+            if(event.source and InputDevice.SOURCE_KEYBOARD == InputDevice.SOURCE_KEYBOARD && !validKeyCodes.contains(event.keyCode)){
+                return false
+            }
+            Log.d("expo-joystick", "handleKeyEvent: "+event)
             val params = mapOf(
                     "action" to getIntConstantName(KeyEvent::class.java, event.action),
                     "keyCode" to event.keyCode,

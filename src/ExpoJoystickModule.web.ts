@@ -7,7 +7,4 @@ export default {
   async setValueAsync(value: string): Promise<void> {
     emitter.emit('onChange', { value });
   },
-  hello() {
-    return 'Hello world! 👋';
-  },
 };
