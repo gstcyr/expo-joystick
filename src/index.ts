@@ -26,3 +26,11 @@ export function onJoyStick(listener: (event: MotionEventPayload) => void): Subsc
         });
   })
 }
+
+export function connectWebSocket(ip, port) {
+    ExpoJoystickModule.connectWebSocket(ip, port);
+}
+
+export function disconnectWebSocket() {
+    ExpoJoystickModule.disconnectWebSocket();
+}

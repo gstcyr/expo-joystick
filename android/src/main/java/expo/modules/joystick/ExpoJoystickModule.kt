@@ -11,6 +11,18 @@ import android.view.InputEvent
 import android.view.MotionEvent
 import android.view.KeyEvent
 import java.lang.reflect.Modifier
+import android.os.Handler
+import android.os.Looper
+import okhttp3.*
+import okhttp3.Request
+import okhttp3.Response
+import okhttp3.WebSocket
+import okhttp3.WebSocketListener
+import org.json.JSONObject
+import java.util.*
+import kotlin.math.absoluteValue
+import java.util.Timer
+import java.util.TimerTask
 
 
 class ExpoJoystickModule : Module() {
@@ -54,7 +66,7 @@ class ExpoJoystickModule : Module() {
         )
 
         // Register listeners when the module is initialized
-         // Hook into the module lifecycle
+        // Hook into the module lifecycle
         OnCreate {
             // Get the current activity and register listeners
             appContext.currentActivity?.let {
@@ -65,23 +77,35 @@ class ExpoJoystickModule : Module() {
 
         OnDestroy {
             // Clean up listeners when the module is destroyed
-            appContext.currentActivity?.let {
-                activity -> unregisterInputListeners(activity)
+            appContext.currentActivity?.let { activity ->
+                unregisterInputListeners(activity)
             }
         }
 
-        // Required to silence NativeEventEmitter warning
-        Function("addListener") { eventName: String ->
-          return@Function
+        Function("connectWebSocket") { ip: String, port: Int ->
+            connectWebSocket(ip, port)
         }
-        // Required to silence NativeEventEmitter warning
-        Function("removeListeners") { count: Int ->
-          return@Function
+        Function("disconnectWebSocket") {
+            disconnectWebSocket()
         }
 
     }
+    //    private var activity: Activity? = null
 
-//    private var activity: Activity? = null
+    private var lastJoystickDevice: InputDevice? = null
+    private var lastSentPayload: Map<String, Any?>? = null
+
+    private val handler = Handler(Looper.getMainLooper())
+    private var isPolling = false
+    private val pollIntervalMs = 40L  // 25 FPS
+
+    // --- WebSocket Support ---
+    private var webSocket: WebSocket? = null
+    private val client = OkHttpClient()
+    private var wsRetryTimer: Timer? = null
+    private var retryAttempts = 0
+    private var lastIp: String? = null
+    private var lastPort: Int? = null
 
     private var inputManager: InputManager? = null
     private var originalCallback: android.view.Window.Callback? = null
@@ -101,6 +125,26 @@ class ExpoJoystickModule : Module() {
             }
         }
         return "UNKNOWN_CONSTANT"
+    }
+
+    private val pollRunnable = object : Runnable {
+        override fun run() {
+            val payload = lastSentPayload ?: return
+
+            //sendEvent("onJoyStick", payload)
+
+            sendJsonOverWebSocket(mapOf(
+                    "method" to "onJoystick",
+                    "data" to payload
+            ))
+
+            val nonZero = payload.filterValues { it is Float }.values.any { (it as Float).absoluteValue >= 0.01f }
+            if (!nonZero) {
+                stopJoystickPolling()
+            } else {
+                handler.postDelayed(this, pollIntervalMs)
+            }
+        }
     }
 
     private fun setupInputManager(activity: Activity) {
@@ -124,27 +168,35 @@ class ExpoJoystickModule : Module() {
         }
 
         activity.window.decorView.setOnGenericMotionListener { _, event ->
-            Log.d("JOYSTICK", "sendJoystickEvent: " + event)
+            Log.d("expo-joystick", "sendJoystickEvent: " + event)
 
             if (event != null && event.source and InputDevice.SOURCE_JOYSTICK == InputDevice.SOURCE_JOYSTICK) {
-                val xAxis = event.getAxisValue(MotionEvent.AXIS_X)
-                val yAxis = event.getAxisValue(MotionEvent.AXIS_Y)
-
                 val params = mapOf(
                     "action" to getIntConstantName(MotionEvent::class.java, event.action),
-                    "AXIS_X" to xAxis,
-                    "AXIS_Y" to yAxis,
+                    "AXIS_X" to event.getAxisValue(MotionEvent.AXIS_X),
+                    "AXIS_Y" to event.getAxisValue(MotionEvent.AXIS_Y),
                     "AXIS_Z" to event.getAxisValue(MotionEvent.AXIS_Z),
                     "AXIS_RZ" to event.getAxisValue(MotionEvent.AXIS_RZ),
                     "AXIS_RX" to event.getAxisValue(MotionEvent.AXIS_RX), // Right Shoulder Axis
                     "AXIS_RY" to event.getAxisValue(MotionEvent.AXIS_RY), // Left Shoulder Axis
                     "AXIS_HAT_X" to event.getAxisValue(MotionEvent.AXIS_HAT_X),
                     "AXIS_HAT_Y" to event.getAxisValue(MotionEvent.AXIS_HAT_Y)
-                 )
-                this@ExpoJoystickModule.sendEvent(
+                )
+
+                lastSentPayload = params
+
+                sendEvent(
                     "onJoyStick",
                     params
                 )
+                sendJsonOverWebSocket(mapOf(
+                    "method" to "onJoystick",
+                    "data" to params
+                ))
+
+                if (!isPolling && params.values.any { it is Float && (it as Float).absoluteValue > 0.01f }) {
+                    startJoystickPolling(event.device)
+                }
 
                 true // Event handled
             } else {
@@ -153,7 +205,19 @@ class ExpoJoystickModule : Module() {
         }
     }
 
-    fun handleKeyEvent(event: KeyEvent) : Boolean {
+    private fun startJoystickPolling(device: InputDevice) {
+        if (isPolling) return
+        isPolling = true
+        lastJoystickDevice = device
+        handler.post(pollRunnable)
+    }
+
+    private fun stopJoystickPolling() {
+        isPolling = false
+        handler.removeCallbacks(pollRunnable)
+    }
+
+    fun handleKeyEvent(event: KeyEvent): Boolean {
         val validKeyCodes = listOf(
                 KeyEvent.KEYCODE_F1, KeyEvent.KEYCODE_F2, KeyEvent.KEYCODE_F3, KeyEvent.KEYCODE_F4,
                 KeyEvent.KEYCODE_F5, KeyEvent.KEYCODE_F6, KeyEvent.KEYCODE_F7, KeyEvent.KEYCODE_F8,
@@ -167,40 +231,100 @@ class ExpoJoystickModule : Module() {
                 event.source and InputDevice.SOURCE_JOYSTICK == InputDevice.SOURCE_JOYSTICK ||
                 event.source and InputDevice.SOURCE_KEYBOARD == InputDevice.SOURCE_KEYBOARD) {
 
-            if(event.source and InputDevice.SOURCE_KEYBOARD == InputDevice.SOURCE_KEYBOARD && !validKeyCodes.contains(event.keyCode)){
+            if (event.source and InputDevice.SOURCE_KEYBOARD == InputDevice.SOURCE_KEYBOARD && !validKeyCodes.contains(event.keyCode)) {
                 return false
             }
-            Log.d("expo-joystick", "handleKeyEvent: "+event)
+            Log.d("expo-joystick", "handleKeyEvent: " + event)
             val params = mapOf(
-                    "action" to getIntConstantName(KeyEvent::class.java, event.action),
-                    "keyCode" to event.keyCode,
-                    "keyName" to getIntConstantName(KeyEvent::class.java, event.keyCode)
+                "action" to getIntConstantName(KeyEvent::class.java, event.action),
+                "keyCode" to event.keyCode,
+                "keyName" to getIntConstantName(KeyEvent::class.java, event.keyCode)
             )
-            this@ExpoJoystickModule.sendEvent(
+            sendEvent(
                 "onButtonPress",
                 params
             )
+            sendJsonOverWebSocket(mapOf(
+                "method" to "onButtonPress",
+                "data" to params
+            ))
             return true
         }
         return false
+    }
+
+    private fun connectWebSocket(ip: String, port: Int) {
+        lastIp = ip
+        lastPort = port
+
+        val url = "ws://$ip:$port"
+        val request = Request.Builder().url(url).build()
+
+        webSocket = client.newWebSocket(request, object : WebSocketListener() {
+            override fun onOpen(ws: WebSocket, response: Response) {
+                Log.d("expo-joystick", "WebSocket connected to $url")
+                retryAttempts = 0
+                wsRetryTimer?.cancel()
+            }
+
+            override fun onFailure(ws: WebSocket, t: Throwable, response: Response?) {
+                Log.e("expo-joystick", "WebSocket error: ${t.message}")
+                attemptReconnect()
+            }
+
+            override fun onClosed(ws: WebSocket, code: Int, reason: String) {
+                Log.w("expo-joystick", "⚠WebSocket closed: $reason")
+                attemptReconnect()
+            }
+        })
+    }
+
+    private fun attemptReconnect() {
+        if (lastIp != null && lastPort != null) {
+            val delay = (1000L * Math.pow(2.0, retryAttempts.coerceAtMost(5).toDouble())).toLong()
+            retryAttempts++
+            wsRetryTimer?.cancel()
+            wsRetryTimer = Timer()
+            wsRetryTimer?.schedule(object : TimerTask() {
+                override fun run() {
+                    connectWebSocket(lastIp!!, lastPort!!)
+                }
+            }, delay)
+            Log.d("expo-joystick", "Retrying in ${delay / 1000}s...")
+        }
+    }
+
+    private fun sendJsonOverWebSocket(map: Map<String, Any?>) {
+        try {
+            val json = JSONObject(map).toString()
+            webSocket?.send(json)
+        } catch (e: Exception) {
+            Log.e("expo-joystick", "Failed to send JSON over WebSocket: ${e.message}")
+        }
+    }
+
+    private fun disconnectWebSocket() {
+        wsRetryTimer?.cancel()
+        webSocket?.close(1000, "Manual disconnect")
+        webSocket = null
     }
 
     private fun unregisterInputListeners(activity: Activity) {
         activity.window?.decorView?.setOnKeyListener(null)
         activity.window?.decorView?.setOnGenericMotionListener(null)
 
-        if(activity != null && originalCallback != null) {
+        if (activity != null && originalCallback != null) {
             activity.window.callback = originalCallback
         }
         //activity = null
     }
 
     private fun getCenteredAxis(
-        event: MotionEvent,
-        device: InputDevice,
-        axis: Int,
-        historyPos: Int
-    ) : Float {
+            event: MotionEvent,
+            device: InputDevice,
+            axis: Int,
+            historyPos: Int
+    ): Float {
         val range: InputDevice.MotionRange? = device.getMotionRange(axis, event.source)
 
         // A joystick at rest does not always report an absolute position of
