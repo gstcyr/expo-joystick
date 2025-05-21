@@ -22,8 +22,6 @@ onButtonPress((event) => {
 If making changes to any `.ts` files, run `tsc` in console to recompile build folder
 
 
-
-
 ### Notes:
 We need to include the `./build` directory since the `expo-module prepare` command is broken on Windows, and thus
 when someone `yarn install`'s this repository, it doesn't build properly. 

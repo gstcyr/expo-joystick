@@ -20,4 +20,10 @@ export function onJoyStick(listener) {
         });
     });
 }
+export function connectWebSocket(ip, port) {
+    ExpoJoystickModule.connectWebSocket(ip, port);
+}
+export function disconnectWebSocket() {
+    ExpoJoystickModule.disconnectWebSocket();
+}
 //# sourceMappingURL=index.js.map
