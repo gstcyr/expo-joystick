@@ -273,8 +273,10 @@ class ExpoJoystickModule : Module() {
             }
 
             override fun onClosed(ws: WebSocket, code: Int, reason: String) {
-                Log.w("expo-joystick", "⚠WebSocket closed: $reason")
-                attemptReconnect()
+                Log.w("expo-joystick", "WebSocket closed: $reason")
+                if(code != 1000) {  // Only attemptReconnect if not manually disconnected
+                    attemptReconnect()
+                }
             }
         })
     }
