@@ -5,7 +5,7 @@ HID Joystick support for React-Native Android
 ### Usage:
 
 ```javascript
-import {onJoyStick, onButtonPress} from "expo-joystick";
+import {onJoyStick, onButtonPress, connectWebSocket, disconnectWebSocket} from "expo-joystick";
 
 onJoyStick((data) => {
     console.log(data);
@@ -15,6 +15,12 @@ onJoyStick((data) => {
 onButtonPress((event) => {
     console.log(event);
 })
+
+
+// ALlows you to have the expo-joystick module connect directly to a websocket server running remotely
+connectWebSocket(ip, port);
+
+disconnectWebSocket();
 ```
 
 

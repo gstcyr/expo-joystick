@@ -1,6 +1,5 @@
 package expo.modules.joystick
 
-
 import android.app.Activity
 import android.hardware.input.InputManager
 import android.view.InputDevice
@@ -21,8 +20,6 @@ import okhttp3.WebSocketListener
 import org.json.JSONObject
 import java.util.*
 import kotlin.math.absoluteValue
-import java.util.Timer
-import java.util.TimerTask
 
 
 class ExpoJoystickModule : Module() {
@@ -102,7 +99,6 @@ class ExpoJoystickModule : Module() {
     // --- WebSocket Support ---
     private var webSocket: WebSocket? = null
     private val client = OkHttpClient()
-    private var wsRetryTimer: Timer? = null
     private var retryAttempts = 0
     private var lastIp: String? = null
     private var lastPort: Int? = null
@@ -168,7 +164,7 @@ class ExpoJoystickModule : Module() {
         }
 
         activity.window.decorView.setOnGenericMotionListener { _, event ->
-            Log.d("expo-joystick", "sendJoystickEvent: " + event)
+            //Log.d("expo-joystick", "sendJoystickEvent: " + event)
 
             if (event != null && event.source and InputDevice.SOURCE_JOYSTICK == InputDevice.SOURCE_JOYSTICK) {
                 val params = mapOf(
@@ -234,7 +230,7 @@ class ExpoJoystickModule : Module() {
             if (event.source and InputDevice.SOURCE_KEYBOARD == InputDevice.SOURCE_KEYBOARD && !validKeyCodes.contains(event.keyCode)) {
                 return false
             }
-            Log.d("expo-joystick", "handleKeyEvent: " + event)
+            //Log.d("expo-joystick", "handleKeyEvent: " + event)
             val params = mapOf(
                 "action" to getIntConstantName(KeyEvent::class.java, event.action),
                 "keyCode" to event.keyCode,
@@ -253,6 +249,12 @@ class ExpoJoystickModule : Module() {
         return false
     }
 
+    private val retryRunnable = object : Runnable {
+        override fun run() {
+            connectWebSocket(lastIp!!, lastPort!!)
+        }
+    }
+
     private fun connectWebSocket(ip: String, port: Int) {
         lastIp = ip
         lastPort = port
@@ -264,7 +266,7 @@ class ExpoJoystickModule : Module() {
             override fun onOpen(ws: WebSocket, response: Response) {
                 Log.d("expo-joystick", "WebSocket connected to $url")
                 retryAttempts = 0
-                wsRetryTimer?.cancel()
+                handler.removeCallbacks(retryRunnable)
             }
 
             override fun onFailure(ws: WebSocket, t: Throwable, response: Response?) {
@@ -285,13 +287,8 @@ class ExpoJoystickModule : Module() {
         if (lastIp != null && lastPort != null) {
             val delay = (1000L * Math.pow(2.0, retryAttempts.coerceAtMost(5).toDouble())).toLong()
             retryAttempts++
-            wsRetryTimer?.cancel()
-            wsRetryTimer = Timer()
-            wsRetryTimer?.schedule(object : TimerTask() {
-                override fun run() {
-                    connectWebSocket(lastIp!!, lastPort!!)
-                }
-            }, delay)
+            handler.removeCallbacks(retryRunnable)  // clear any pending retries
+            handler.postDelayed(retryRunnable, delay)
             Log.d("expo-joystick", "Retrying in ${delay / 1000}s...")
         }
     }
@@ -306,7 +303,7 @@ class ExpoJoystickModule : Module() {
     }
 
     private fun disconnectWebSocket() {
-        wsRetryTimer?.cancel()
+        handler.removeCallbacks(retryRunnable)
         webSocket?.close(1000, "Manual disconnect")
         webSocket = null
     }
