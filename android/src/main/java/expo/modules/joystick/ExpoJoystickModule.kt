@@ -85,9 +85,11 @@ class ExpoJoystickModule : Module() {
         Function("disconnectWebSocket") {
             disconnectWebSocket()
         }
+        Function("sendButtonPressOverWebSocket") { button: Int, send: Boolean ->
+            sendOverWsEnabled[button] = send;
+        }
 
     }
-    //    private var activity: Activity? = null
 
     private var lastJoystickDevice: InputDevice? = null
     private var lastSentPayload: Map<String, Any?>? = null
@@ -105,6 +107,17 @@ class ExpoJoystickModule : Module() {
 
     private var inputManager: InputManager? = null
     private var originalCallback: android.view.Window.Callback? = null
+
+    private val validKeyCodes = listOf(
+        KeyEvent.KEYCODE_F1, KeyEvent.KEYCODE_F2, KeyEvent.KEYCODE_F3, KeyEvent.KEYCODE_F4,
+        KeyEvent.KEYCODE_F5, KeyEvent.KEYCODE_F6, KeyEvent.KEYCODE_F7, KeyEvent.KEYCODE_F8,
+        KeyEvent.KEYCODE_F9, KeyEvent.KEYCODE_F10, KeyEvent.KEYCODE_Z,
+        KeyEvent.KEYCODE_BUTTON_A, KeyEvent.KEYCODE_BUTTON_B, KeyEvent.KEYCODE_BUTTON_Z,
+        KeyEvent.KEYCODE_BUTTON_R1, KeyEvent.KEYCODE_BUTTON_L1, KeyEvent.KEYCODE_BUTTON_THUMBL,
+        KeyEvent.KEYCODE_BUTTON_R2, KeyEvent.KEYCODE_BUTTON_L2, KeyEvent.KEYCODE_BACK
+    )
+
+    private val sendOverWsEnabled: MutableMap<Int, Boolean> = validKeyCodes.associateWith { true }.toMutableMap()
 
     fun <T> getIntConstantName(targetClass: Class<T>, value: Int): String {
         val fields = targetClass.declaredFields
@@ -130,8 +143,8 @@ class ExpoJoystickModule : Module() {
             //sendEvent("onJoyStick", payload)
 
             sendJsonOverWebSocket(mapOf(
-                    "method" to "onJoystick",
-                    "data" to payload
+                "method" to "onJoystick",
+                "data" to payload
             ))
 
             val nonZero = payload.filterValues { it is Float }.values.any { (it as Float).absoluteValue >= 0.01f }
@@ -214,18 +227,11 @@ class ExpoJoystickModule : Module() {
     }
 
     fun handleKeyEvent(event: KeyEvent): Boolean {
-        val validKeyCodes = listOf(
-                KeyEvent.KEYCODE_F1, KeyEvent.KEYCODE_F2, KeyEvent.KEYCODE_F3, KeyEvent.KEYCODE_F4,
-                KeyEvent.KEYCODE_F5, KeyEvent.KEYCODE_F6, KeyEvent.KEYCODE_F7, KeyEvent.KEYCODE_F8,
-                KeyEvent.KEYCODE_F9, KeyEvent.KEYCODE_F10, KeyEvent.KEYCODE_Z,
-                KeyEvent.KEYCODE_BUTTON_A, KeyEvent.KEYCODE_BUTTON_B, KeyEvent.KEYCODE_BUTTON_Z,
-                KeyEvent.KEYCODE_BUTTON_R1, KeyEvent.KEYCODE_BUTTON_L1, KeyEvent.KEYCODE_BUTTON_THUMBL,
-                KeyEvent.KEYCODE_BUTTON_R2, KeyEvent.KEYCODE_BUTTON_L2, KeyEvent.KEYCODE_BACK
-        )
+
 
         if (event.source and InputDevice.SOURCE_GAMEPAD == InputDevice.SOURCE_GAMEPAD ||
-                event.source and InputDevice.SOURCE_JOYSTICK == InputDevice.SOURCE_JOYSTICK ||
-                event.source and InputDevice.SOURCE_KEYBOARD == InputDevice.SOURCE_KEYBOARD) {
+            event.source and InputDevice.SOURCE_JOYSTICK == InputDevice.SOURCE_JOYSTICK ||
+            event.source and InputDevice.SOURCE_KEYBOARD == InputDevice.SOURCE_KEYBOARD) {
 
             if (event.source and InputDevice.SOURCE_KEYBOARD == InputDevice.SOURCE_KEYBOARD && !validKeyCodes.contains(event.keyCode)) {
                 return false
@@ -240,10 +246,14 @@ class ExpoJoystickModule : Module() {
                 "onButtonPress",
                 params
             )
-            sendJsonOverWebSocket(mapOf(
-                "method" to "onButtonPress",
-                "data" to params
-            ))
+            if(sendOverWsEnabled[event.keyCode] == true) {
+                sendJsonOverWebSocket(
+                    mapOf(
+                        "method" to "onButtonPress",
+                        "data" to params
+                    )
+                )
+            }
             return true
         }
         return false
@@ -319,10 +329,10 @@ class ExpoJoystickModule : Module() {
     }
 
     private fun getCenteredAxis(
-            event: MotionEvent,
-            device: InputDevice,
-            axis: Int,
-            historyPos: Int
+        event: MotionEvent,
+        device: InputDevice,
+        axis: Int,
+        historyPos: Int
     ): Float {
         val range: InputDevice.MotionRange? = device.getMotionRange(axis, event.source)
 
