@@ -6,4 +6,5 @@ export declare function onButtonPress(listener: (event: KeyEventPayload) => void
 export declare function onJoyStick(listener: (event: MotionEventPayload) => void): Subscription;
 export declare function connectWebSocket(ip: any, port: any): void;
 export declare function disconnectWebSocket(): void;
+export declare function sendButtonPressOverWebSocket(keyEvent: any, enabled: any): void;
 //# sourceMappingURL=index.d.ts.map

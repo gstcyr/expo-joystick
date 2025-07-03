@@ -34,3 +34,7 @@ export function connectWebSocket(ip, port) {
 export function disconnectWebSocket() {
     ExpoJoystickModule.disconnectWebSocket();
 }
+
+export function sendButtonPressOverWebSocket(keyEvent, enabled) {
+    ExpoJoystickModule.sendButtonPressOverWebSocket(keyEvent, enabled)
+}
