@@ -68,7 +68,6 @@ class ExpoJoystickModule : Module() {
             // Get the current activity and register listeners
             appContext.currentActivity?.let {
                 registerInputListeners(it)
-                setupInputManager(it)
             }
         }
 
@@ -85,14 +84,27 @@ class ExpoJoystickModule : Module() {
         Function("disconnectWebSocket") {
             disconnectWebSocket()
         }
-        Function("sendButtonPressOverWebSocket") { button: Int, send: Boolean ->
-            sendOverWsEnabled[button] = send;
+        Function("sendButtonPressOverWebSocket") { keyCode: Int, send: Boolean ->
+            sendOverWsEnabled[keyCode] = send;
         }
-
+        Function("setButtonModifiers") { keyCode: Int, modifiers: Map<String, Any> ->
+            buttonModifiers[keyCode] = modifiers.toMutableMap();
+        }
+        Function("setAxisModifiers") { motionEvent: Int, modifiers: Map<String, Any> ->
+            axisModifiers[motionEvent] = modifiers.toMutableMap();
+        }
     }
 
     private var lastJoystickDevice: InputDevice? = null
     private var lastSentPayload: Map<String, Any?>? = null
+    // Tracks previous value for each AXIS_* to suppress unchanged or zero-state repeats
+    private val lastAxisValues = mutableMapOf<String, Float>()
+
+    // Optional per-axis deadzone overrides (default = 0.01f)
+    private val deadzoneOverrides = mutableMapOf<String, Float>()
+
+    // Default deadzone fallback
+    private val defaultDeadzone = 0.01f
 
     private val handler = Handler(Looper.getMainLooper())
     private var isPolling = false
@@ -118,6 +130,9 @@ class ExpoJoystickModule : Module() {
     )
 
     private val sendOverWsEnabled: MutableMap<Int, Boolean> = validKeyCodes.associateWith { true }.toMutableMap()
+    private val buttonModifiers: MutableMap<Int, MutableMap<String, Any>> = mutableMapOf()
+    private val axisModifiers: MutableMap<Int, MutableMap<String, Any>> = mutableMapOf()
+
 
     fun <T> getIntConstantName(targetClass: Class<T>, value: Int): String {
         val fields = targetClass.declaredFields
@@ -136,11 +151,10 @@ class ExpoJoystickModule : Module() {
         return "UNKNOWN_CONSTANT"
     }
 
+
     private val pollRunnable = object : Runnable {
         override fun run() {
             val payload = lastSentPayload ?: return
-
-            //sendEvent("onJoyStick", payload)
 
             sendJsonOverWebSocket(mapOf(
                 "method" to "onJoystick",
@@ -156,8 +170,21 @@ class ExpoJoystickModule : Module() {
         }
     }
 
-    private fun setupInputManager(activity: Activity) {
-        inputManager = activity.getSystemService(Activity.INPUT_SERVICE) as InputManager
+    private fun shouldIncludeAxis(axisName: String, current: Float, previous: Float?): Boolean {
+        val deadzone = deadzoneOverrides[axisName] ?: defaultDeadzone
+        val isMoving = current.absoluteValue > deadzone
+        val wasMoving = previous?.absoluteValue ?: 0f > deadzone
+
+        return isMoving || wasMoving
+    }
+
+    private fun getAxisName(value: Int): String {
+        return MotionEvent::class.java.fields
+            .firstOrNull { field ->
+                field.type == Int::class.java &&
+                        field.name.startsWith("AXIS_") &&
+                        field.getInt(null) == value
+            }?.name ?: "AXIS_$value"
     }
 
     private fun registerInputListeners(activity: Activity) {
@@ -177,23 +204,35 @@ class ExpoJoystickModule : Module() {
         }
 
         activity.window.decorView.setOnGenericMotionListener { _, event ->
-            //Log.d("expo-joystick", "sendJoystickEvent: " + event)
-
             if (event != null && event.source and InputDevice.SOURCE_JOYSTICK == InputDevice.SOURCE_JOYSTICK) {
-                val params = mapOf(
+
+                val axisValuesToSend = mutableMapOf<String, Float>()
+                val axisModifiersToSend = mutableMapOf<String, Map<String, Any>>()
+
+                for (range in event.device.motionRanges) {
+                    if (!range.isFromSource(InputDevice.SOURCE_JOYSTICK)) continue
+                    val axisCode = range.axis
+                    val axisName = getAxisName(axisCode)
+
+                    val currentValue = event.getAxisValue(axisCode)
+                    val previousValue = lastAxisValues[axisName]
+
+                    if (shouldIncludeAxis(axisName, currentValue, previousValue)) {
+                        axisValuesToSend[axisName] = currentValue
+                        axisModifiers[axisCode]?.let { props ->
+                            axisModifiersToSend[axisName] = props
+                        }
+                    }
+                    lastAxisValues[axisName] = currentValue
+                }
+
+                val params = mutableMapOf<String, Any>(
                     "action" to getIntConstantName(MotionEvent::class.java, event.action),
-                    "AXIS_X" to event.getAxisValue(MotionEvent.AXIS_X),
-                    "AXIS_Y" to event.getAxisValue(MotionEvent.AXIS_Y),
-                    "AXIS_Z" to event.getAxisValue(MotionEvent.AXIS_Z),
-                    "AXIS_RZ" to event.getAxisValue(MotionEvent.AXIS_RZ),
-                    "AXIS_RX" to event.getAxisValue(MotionEvent.AXIS_RX), // Right Shoulder Axis
-                    "AXIS_RY" to event.getAxisValue(MotionEvent.AXIS_RY), // Left Shoulder Axis
-                    "AXIS_HAT_X" to event.getAxisValue(MotionEvent.AXIS_HAT_X),
-                    "AXIS_HAT_Y" to event.getAxisValue(MotionEvent.AXIS_HAT_Y)
+                    "modifiers" to axisModifiersToSend,
                 )
+                params.putAll(axisValuesToSend);
 
                 lastSentPayload = params
-
                 sendEvent(
                     "onJoyStick",
                     params
@@ -203,7 +242,7 @@ class ExpoJoystickModule : Module() {
                     "data" to params
                 ))
 
-                if (!isPolling && params.values.any { it is Float && (it as Float).absoluteValue > 0.01f }) {
+                if (!isPolling && params.values.any { it is Float && (it as Float).absoluteValue > defaultDeadzone}) {
                     startJoystickPolling(event.device)
                 }
 
@@ -228,7 +267,6 @@ class ExpoJoystickModule : Module() {
 
     fun handleKeyEvent(event: KeyEvent): Boolean {
 
-
         if (event.source and InputDevice.SOURCE_GAMEPAD == InputDevice.SOURCE_GAMEPAD ||
             event.source and InputDevice.SOURCE_JOYSTICK == InputDevice.SOURCE_JOYSTICK ||
             event.source and InputDevice.SOURCE_KEYBOARD == InputDevice.SOURCE_KEYBOARD) {
@@ -240,7 +278,8 @@ class ExpoJoystickModule : Module() {
             val params = mapOf(
                 "action" to getIntConstantName(KeyEvent::class.java, event.action),
                 "keyCode" to event.keyCode,
-                "keyName" to getIntConstantName(KeyEvent::class.java, event.keyCode)
+                "keyName" to getIntConstantName(KeyEvent::class.java, event.keyCode),
+                "modifiers" to (buttonModifiers[event.keyCode] ?: emptyMap<String, Any>())
             )
             sendEvent(
                 "onButtonPress",
@@ -326,62 +365,6 @@ class ExpoJoystickModule : Module() {
             activity.window.callback = originalCallback
         }
         //activity = null
-    }
-
-    private fun getCenteredAxis(
-        event: MotionEvent,
-        device: InputDevice,
-        axis: Int,
-        historyPos: Int
-    ): Float {
-        val range: InputDevice.MotionRange? = device.getMotionRange(axis, event.source)
-
-        // A joystick at rest does not always report an absolute position of
-        // (0,0). Use the getFlat() method to determine the range of values
-        // bounding the joystick axis center.
-        range?.apply {
-            val value: Float = if (historyPos < 0) {
-                event.getAxisValue(axis)
-            } else {
-                event.getHistoricalAxisValue(axis, historyPos)
-            }
-
-            // Ignore axis values that are within the 'flat' region of the
-            // joystick axis center.
-            if (Math.abs(value) > flat) {
-                return value
-            }
-        }
-        return 0f
-    }
-
-    private fun processJoystickInput(event: MotionEvent, historyPos: Int) {
-
-        val inputDevice = event.device
-
-        // Calculate the horizontal distance to move by
-        // using the input value from one of these physical controls:
-        // the left control stick, hat axis, or the right control stick.
-        var x: Float = getCenteredAxis(event, inputDevice, MotionEvent.AXIS_X, historyPos)
-        if (x == 0f) {
-            x = getCenteredAxis(event, inputDevice, MotionEvent.AXIS_HAT_X, historyPos)
-        }
-        if (x == 0f) {
-            x = getCenteredAxis(event, inputDevice, MotionEvent.AXIS_Z, historyPos)
-        }
-
-        // Calculate the vertical distance to move by
-        // using the input value from one of these physical controls:
-        // the left control stick, hat switch, or the right control stick.
-        var y: Float = getCenteredAxis(event, inputDevice, MotionEvent.AXIS_Y, historyPos)
-        if (y == 0f) {
-            y = getCenteredAxis(event, inputDevice, MotionEvent.AXIS_HAT_Y, historyPos)
-        }
-        if (y == 0f) {
-            y = getCenteredAxis(event, inputDevice, MotionEvent.AXIS_RZ, historyPos)
-        }
-
-        // Update the ship object based on the new x and y values
     }
 
 }

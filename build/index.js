@@ -2,9 +2,10 @@ import { NativeModulesProxy, EventEmitter } from 'expo-modules-core';
 // Import the native module. On web, it will be resolved to ExpoJoystick.web.ts
 // and on native platforms to ExpoJoystick.ts
 import ExpoJoystickModule from './ExpoJoystickModule';
+export { MotionEvent, KeyEvent } from "./ExpoJoystick.constants";
 // Get the native constant value.
-export const MotionEvent = ExpoJoystickModule.MotionEvent;
-export const KeyEvent = ExpoJoystickModule.KeyEvent;
+//export const MotionEvent = ExpoJoystickModule.MotionEvent;
+//export const KeyEvent = ExpoJoystickModule.KeyEvent;
 const emitter = new EventEmitter(ExpoJoystickModule ?? NativeModulesProxy.ExpoJoystick);
 export function onButtonPress(listener) {
     return emitter.addListener('onButtonPress', listener);
@@ -12,11 +13,11 @@ export function onButtonPress(listener) {
 export function onJoyStick(listener) {
     return emitter.addListener('onJoyStick', (event) => {
         listener({
-            LEFT: [event.AXIS_X, event.AXIS_Y],
-            RIGHT: [event.AXIS_Z, event.AXIS_RZ],
-            DPAD: [event.AXIS_HAT_X, event.AXIS_HAT_Y],
-            TRIGGER_L: event.AXIS_RX,
-            TRIGGER_R: event.AXIS_RY
+            LEFT: [event.AXIS_X || 0, event.AXIS_Y || 0],
+            RIGHT: [event.AXIS_Z || 0, event.AXIS_RZ || 0],
+            DPAD: [event.AXIS_HAT_X || 0, event.AXIS_HAT_Y || 0],
+            TRIGGER_L: event.AXIS_RX || 0,
+            TRIGGER_R: event.AXIS_RY || 0
         });
     });
 }
@@ -26,7 +27,13 @@ export function connectWebSocket(ip, port) {
 export function disconnectWebSocket() {
     ExpoJoystickModule.disconnectWebSocket();
 }
-export function sendButtonPressOverWebSocket(keyEvent, enabled) {
-    ExpoJoystickModule.sendButtonPressOverWebSocket(keyEvent, enabled);
+export function sendButtonPressOverWebSocket(keyCode, enabled) {
+    ExpoJoystickModule.sendButtonPressOverWebSocket(keyCode, enabled);
+}
+export function setButtonModifiers(keyCode, modifiers) {
+    ExpoJoystickModule.setButtonModifiers(keyCode, modifiers);
+}
+export function setAxisModifiers(motionEvent, modifiers) {
+    ExpoJoystickModule.setAxisModifiers(motionEvent, modifiers);
 }
 //# sourceMappingURL=index.js.map
