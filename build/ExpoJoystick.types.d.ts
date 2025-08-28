@@ -1,4 +1,4 @@
-export type MotionEventPayload2 = {
+export declare type MotionEventPayload2 = {
     action: string;
     AXIS_HAT_X: number;
     AXIS_HAT_Y: number;
@@ -9,14 +9,14 @@ export type MotionEventPayload2 = {
     AXIS_Y: number;
     AXIS_Z: number;
 };
-export type MotionEventPayload = {
+export declare type MotionEventPayload = {
     LEFT: number[];
     RIGHT: number[];
     TRIGGER_L: number;
     TRIGGER_R: number;
     DPAD: number[];
 };
-export type KeyEventPayload = {
+export declare type KeyEventPayload = {
     action: string;
     keyCode: number;
     keyName: string;
