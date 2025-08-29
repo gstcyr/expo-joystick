@@ -5,6 +5,8 @@ export declare function onButtonPress(listener: (event: KeyEventPayload) => void
 export declare function onJoyStick(listener: (event: MotionEventPayload) => void): Subscription;
 export declare function connectWebSocket(ip: any, port: any): void;
 export declare function disconnectWebSocket(): void;
+export declare function getWebSocketStatus(): any;
+export declare function useWebSocketStatus(): any;
 export declare function sendButtonPressOverWebSocket(keyCode: any, enabled: any): void;
 export declare function setButtonModifiers(keyCode: any, modifiers: any): void;
 export declare function setAxisModifiers(motionEvent: any, modifiers: any): void;
