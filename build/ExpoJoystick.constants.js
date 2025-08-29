@@ -21,4 +21,10 @@ export const KeyEvent = {
     ACTION_UP: 1,
     ACTION_DOWN: 0,
 };
+export const WebSocketStatus = {
+    DISCONNECTED: 'disconnected',
+    CONNECTING: 'connecting',
+    CONNECTED: 'connected',
+    ERROR: 'error'
+};
 //# sourceMappingURL=ExpoJoystick.constants.js.map

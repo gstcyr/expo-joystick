@@ -1,10 +1,10 @@
-import { useState } from "react";
-import { Platform } from "react-native";
+import { useState } from 'react';
+import { Platform } from 'react-native';
 import { NativeModulesProxy, EventEmitter } from 'expo-modules-core';
 // Import the native module. On web, it will be resolved to ExpoJoystick.web.ts
 // and on native platforms to ExpoJoystick.ts
 import ExpoJoystickModule from './ExpoJoystickModule';
-export { MotionEvent, KeyEvent } from "./ExpoJoystick.constants";
+export { MotionEvent, KeyEvent, WebSocketStatus } from "./ExpoJoystick.constants";
 // Get the native constant value.
 //export const MotionEvent = ExpoJoystickModule.MotionEvent;
 //export const KeyEvent = ExpoJoystickModule.KeyEvent;

@@ -21,4 +21,10 @@ export declare const KeyEvent: {
     readonly ACTION_UP: 1;
     readonly ACTION_DOWN: 0;
 };
+export declare const WebSocketStatus: {
+    DISCONNECTED: string;
+    CONNECTING: string;
+    CONNECTED: string;
+    ERROR: string;
+};
 //# sourceMappingURL=ExpoJoystick.constants.d.ts.map

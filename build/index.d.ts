@@ -1,6 +1,6 @@
 import { Subscription } from 'expo-modules-core';
 import { KeyEventPayload, MotionEventPayload } from './ExpoJoystick.types';
-export { MotionEvent, KeyEvent } from "./ExpoJoystick.constants";
+export { MotionEvent, KeyEvent, WebSocketStatus } from "./ExpoJoystick.constants";
 export declare function onButtonPress(listener: (event: KeyEventPayload) => void): Subscription;
 export declare function onJoyStick(listener: (event: MotionEventPayload) => void): Subscription;
 export declare function connectWebSocket(ip: any, port: any): void;
