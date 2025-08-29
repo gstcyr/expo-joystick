@@ -34,7 +34,7 @@ class ExpoJoystickModule : Module() {
         Name("ExpoJoystick")
 
         // Defines event names that the module can send to JavaScript.
-        Events("onButtonPress", "onJoyStick")
+        Events("onButtonPress", "onJoyStick", "websocketStatus")
 
         Constants(
             "MotionEvent" to mapOf(
@@ -93,6 +93,9 @@ class ExpoJoystickModule : Module() {
         Function("setAxisModifiers") { motionEvent: Int, modifiers: Map<String, Any> ->
             axisModifiers[motionEvent] = modifiers.toMutableMap();
         }
+        Function("getWebSocketStatus") {
+            socketState.name.lowercase()
+        }
     }
 
     private var lastJoystickDevice: InputDevice? = null
@@ -116,6 +119,11 @@ class ExpoJoystickModule : Module() {
     private var retryAttempts = 0
     private var lastIp: String? = null
     private var lastPort: Int? = null
+
+    enum class WebSocketState {
+        DISCONNECTED, CONNECTING, CONNECTED, ERROR
+    }
+    private var socketState = WebSocketState.DISCONNECTED
 
     private var inputManager: InputManager? = null
     private var originalCallback: android.view.Window.Callback? = null
@@ -311,16 +319,28 @@ class ExpoJoystickModule : Module() {
         val url = "ws://$ip:$port"
         val request = Request.Builder().url(url).build()
 
+        socketState = WebSocketState.CONNECTING
+        sendEvent("websocketStatus", mapOf("status" to "connecting"))
+        Log.d("expo-joystick", "Sending websocketStatus: ${socketState.name.lowercase()}")
+
         webSocket = client.newWebSocket(request, object : WebSocketListener() {
             override fun onOpen(ws: WebSocket, response: Response) {
                 Log.d("expo-joystick", "WebSocket connected to $url")
                 retryAttempts = 0
                 handler.removeCallbacks(retryRunnable)
+                socketState = WebSocketState.CONNECTED
+                sendEvent("websocketStatus", mapOf("status" to socketState.name.lowercase()))
             }
 
             override fun onFailure(ws: WebSocket, t: Throwable, response: Response?) {
                 Log.e("expo-joystick", "WebSocket error: ${t.message}")
                 attemptReconnect()
+                socketState = WebSocketState.ERROR
+                sendEvent("websocketStatus", mapOf(
+                    "status" to socketState.name.lowercase(),
+                    "error" to t.message
+                ))
+
             }
 
             override fun onClosed(ws: WebSocket, code: Int, reason: String) {
@@ -328,6 +348,9 @@ class ExpoJoystickModule : Module() {
                 if(code != 1000) {  // Only attemptReconnect if not manually disconnected
                     attemptReconnect()
                 }
+                socketState = WebSocketState.DISCONNECTED
+                sendEvent("websocketStatus", mapOf("status" to socketState.name.lowercase()))
+
             }
         })
     }

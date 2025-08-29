@@ -1,10 +1,12 @@
+import {useState} from 'react';
+import {Platform} from 'react-native';
 import { NativeModulesProxy, EventEmitter, Subscription } from 'expo-modules-core';
 
 // Import the native module. On web, it will be resolved to ExpoJoystick.web.ts
 // and on native platforms to ExpoJoystick.ts
 import ExpoJoystickModule from './ExpoJoystickModule';
 import { KeyEventPayload, MotionEventPayload, MotionEventPayload2 } from './ExpoJoystick.types';
-export { MotionEvent, KeyEvent } from "./ExpoJoystick.constants";
+export { MotionEvent, KeyEvent, WebSocketStatus } from "./ExpoJoystick.constants";
 
 // Get the native constant value.
 //export const MotionEvent = ExpoJoystickModule.MotionEvent;
@@ -35,6 +37,26 @@ export function connectWebSocket(ip, port) {
 export function disconnectWebSocket() {
     ExpoJoystickModule.disconnectWebSocket();
 }
+export function getWebSocketStatus() {
+    return ExpoJoystickModule.getWebSocketStatus();
+}
+
+type WebSocketStatusEvent = {
+  status: string;
+  error?: string;
+};
+
+export function useWebSocketStatus() {
+    if(Platform.OS !== 'android') return "disabled";
+
+    const [status, setStatus] = useState(getWebSocketStatus());
+    const sub = emitter.addListener("websocketStatus", ({status, error}: WebSocketStatusEvent) => {
+        setStatus(status);
+        return () => sub.remove();
+    })
+    return status;
+}
+
 
 export function sendButtonPressOverWebSocket(keyCode, enabled) {
     ExpoJoystickModule.sendButtonPressOverWebSocket(keyCode, enabled)
