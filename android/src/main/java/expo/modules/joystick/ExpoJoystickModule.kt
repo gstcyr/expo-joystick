@@ -11,6 +11,7 @@ import android.view.MotionEvent
 import android.view.KeyEvent
 import java.lang.reflect.Modifier
 import android.os.Handler
+import android.os.HandlerThread
 import android.os.Looper
 import okhttp3.*
 import okhttp3.Request
@@ -99,7 +100,7 @@ class ExpoJoystickModule : Module() {
     }
 
     private var lastJoystickDevice: InputDevice? = null
-    private var lastSentPayload: Map<String, Any?>? = null
+    private var lastSentPayload: MutableMap<String, Any?>? = null
     // Tracks previous value for each AXIS_* to suppress unchanged or zero-state repeats
     private val lastAxisValues = mutableMapOf<String, Float>()
 
@@ -109,9 +110,11 @@ class ExpoJoystickModule : Module() {
     // Default deadzone fallback
     private val defaultDeadzone = 0.01f
 
-    private val handler = Handler(Looper.getMainLooper())
+    private var lastSent: Long = System.currentTimeMillis()
+    private val pollThread = HandlerThread("JoystickPoller").apply {start() } //Handler(Looper.getMainLooper())
+    private val handler = Handler(pollThread.looper)
     private var isPolling = false
-    private val pollIntervalMs = 40L  // 25 FPS
+    private val pollIntervalMs = 16L  // 25 FPS
 
     // --- WebSocket Support ---
     private var webSocket: WebSocket? = null
@@ -164,11 +167,17 @@ class ExpoJoystickModule : Module() {
         override fun run() {
             val payload = lastSentPayload ?: return
 
+            val now = System.currentTimeMillis()
+            val delta = now - lastSent
+
+            payload.put("delta", delta)
+
             sendJsonOverWebSocket(mapOf(
                 "method" to "onJoystick",
                 "data" to payload
             ))
 
+            lastSent = System.currentTimeMillis()
             val nonZero = payload.filterValues { it is Float }.values.any { (it as Float).absoluteValue >= 0.01f }
             if (!nonZero) {
                 stopJoystickPolling()
@@ -181,7 +190,7 @@ class ExpoJoystickModule : Module() {
     private fun shouldIncludeAxis(axisName: String, current: Float, previous: Float?): Boolean {
         val deadzone = deadzoneOverrides[axisName] ?: defaultDeadzone
         val isMoving = current.absoluteValue > deadzone
-        val wasMoving = previous?.absoluteValue ?: 0f > deadzone
+        val wasMoving = (previous?.absoluteValue ?: 0f) > deadzone
 
         return isMoving || wasMoving
     }
@@ -234,22 +243,17 @@ class ExpoJoystickModule : Module() {
                     lastAxisValues[axisName] = currentValue
                 }
 
-                val params = mutableMapOf<String, Any>(
+                val params = mutableMapOf<String, Any?>(
                     "action" to getIntConstantName(MotionEvent::class.java, event.action),
                     "modifiers" to axisModifiersToSend,
                 )
                 params.putAll(axisValuesToSend);
 
-                lastSentPayload = params
+                lastSentPayload = HashMap(params)
                 sendEvent(
                     "onJoyStick",
                     params
                 )
-                sendJsonOverWebSocket(mapOf(
-                    "method" to "onJoystick",
-                    "data" to params
-                ))
-
                 if (!isPolling && params.values.any { it is Float && (it as Float).absoluteValue > defaultDeadzone}) {
                     startJoystickPolling(event.device)
                 }
@@ -264,6 +268,7 @@ class ExpoJoystickModule : Module() {
     private fun startJoystickPolling(device: InputDevice) {
         if (isPolling) return
         isPolling = true
+        lastSent = System.currentTimeMillis()
         lastJoystickDevice = device
         handler.post(pollRunnable)
     }
@@ -384,7 +389,7 @@ class ExpoJoystickModule : Module() {
         activity.window?.decorView?.setOnKeyListener(null)
         activity.window?.decorView?.setOnGenericMotionListener(null)
 
-        if (activity != null && originalCallback != null) {
+        if (originalCallback != null) {
             activity.window.callback = originalCallback
         }
         //activity = null
