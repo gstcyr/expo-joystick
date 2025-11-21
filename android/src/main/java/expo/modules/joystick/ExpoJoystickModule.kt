@@ -94,6 +94,10 @@ class ExpoJoystickModule : Module() {
         Function("setAxisModifiers") { motionEvent: Int, modifiers: Map<String, Any> ->
             axisModifiers[motionEvent] = modifiers.toMutableMap();
         }
+        Function("setAxisDeadzone") { motionEvent: Int, deadZone: Float ->
+            val axisName = getAxisName(motionEvent)
+            deadzoneOverrides[axisName] = deadZone;
+        }
         Function("getWebSocketStatus") {
             socketState.name.lowercase()
         }
@@ -114,7 +118,7 @@ class ExpoJoystickModule : Module() {
     private val pollThread = HandlerThread("JoystickPoller").apply {start() } //Handler(Looper.getMainLooper())
     private val handler = Handler(pollThread.looper)
     private var isPolling = false
-    private val pollIntervalMs = 16L  // 25 FPS
+    private val pollIntervalMs = 16L  // 62.5 FPS
 
     // --- WebSocket Support ---
     private var webSocket: WebSocket? = null

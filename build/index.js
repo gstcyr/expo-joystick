@@ -1,5 +1,4 @@
 import { useState } from 'react';
-import { Platform } from 'react-native';
 import { NativeModulesProxy, EventEmitter } from 'expo-modules-core';
 // Import the native module. On web, it will be resolved to ExpoJoystick.web.ts
 // and on native platforms to ExpoJoystick.ts
@@ -9,6 +8,9 @@ export { MotionEvent, KeyEvent, WebSocketStatus } from "./ExpoJoystick.constants
 //export const MotionEvent = ExpoJoystickModule.MotionEvent;
 //export const KeyEvent = ExpoJoystickModule.KeyEvent;
 const emitter = new EventEmitter(ExpoJoystickModule ?? NativeModulesProxy.ExpoJoystick);
+export function testFunction() {
+    return ExpoJoystickModule.testFunction();
+}
 export function onButtonPress(listener) {
     return emitter.addListener('onButtonPress', listener);
 }
@@ -33,8 +35,6 @@ export function getWebSocketStatus() {
     return ExpoJoystickModule.getWebSocketStatus();
 }
 export function useWebSocketStatus() {
-    if (Platform.OS !== 'android')
-        return "disabled";
     const [status, setStatus] = useState(getWebSocketStatus());
     const sub = emitter.addListener("websocketStatus", ({ status, error }) => {
         setStatus(status);
@@ -50,5 +50,20 @@ export function setButtonModifiers(keyCode, modifiers) {
 }
 export function setAxisModifiers(motionEvent, modifiers) {
     ExpoJoystickModule.setAxisModifiers(motionEvent, modifiers);
+}
+export function setAxisDeadzone(motionEvent, deadZone) {
+    ExpoJoystickModule.setAxisDeadzone(motionEvent, deadZone);
+}
+export function buttonDown(keyName) {
+    console.log("BUTTON DOWN");
+    if (ExpoJoystickModule.buttonDown) {
+        ExpoJoystickModule.buttonDown(keyName);
+    }
+}
+export function buttonUp(keyName) {
+    console.log("BUTTON UP");
+    if (ExpoJoystickModule.buttonUp) {
+        ExpoJoystickModule.buttonUp(keyName);
+    }
 }
 //# sourceMappingURL=index.js.map

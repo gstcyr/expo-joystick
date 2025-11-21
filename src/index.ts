@@ -1,5 +1,4 @@
 import {useState} from 'react';
-import {Platform} from 'react-native';
 import { NativeModulesProxy, EventEmitter, Subscription } from 'expo-modules-core';
 
 // Import the native module. On web, it will be resolved to ExpoJoystick.web.ts
@@ -47,7 +46,6 @@ type WebSocketStatusEvent = {
 };
 
 export function useWebSocketStatus() {
-    if(Platform.OS !== 'android') return "disabled";
 
     const [status, setStatus] = useState(getWebSocketStatus());
     const sub = emitter.addListener("websocketStatus", ({status, error}: WebSocketStatusEvent) => {
@@ -68,4 +66,19 @@ export function setButtonModifiers(keyCode, modifiers) {
 
 export function setAxisModifiers(motionEvent, modifiers) {
     ExpoJoystickModule.setAxisModifiers(motionEvent, modifiers);
+}
+export function setAxisDeadzone(motionEvent, deadZone) {
+    ExpoJoystickModule.setAxisDeadzone(motionEvent, deadZone);
+}
+
+export function buttonDown(keyName: string) {
+    if (ExpoJoystickModule.buttonDown) {
+        ExpoJoystickModule.buttonDown(keyName);
+    }
+}
+
+export function buttonUp(keyName: string) {
+    if (ExpoJoystickModule.buttonUp) {
+        ExpoJoystickModule.buttonUp(keyName);
+    }
 }
