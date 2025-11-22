@@ -45,6 +45,12 @@ class ExpoJoystickWeb {
     private axisModifiers: { [key: string]: { [key: string]: any } } = {};
     private deadzoneOverrides: { [key: string]: number } = {};
     private defaultDeadzone: number = 0.01;
+    private axisInversions: { [key: string]: boolean } = {
+        'AXIS_X': false,
+        'AXIS_Y': false,
+        'AXIS_Z': false,
+        'AXIS_RZ': false
+    };
 
     private pollIntervalMs: number = 40; // 25 FPS
     private lastPollTime: number = 0;
@@ -172,7 +178,8 @@ class ExpoJoystickWeb {
             const previousValue = this.lastAxisValues[axisName] || 0;
 
             if (this.shouldIncludeAxis(axisName, value, previousValue)) {
-                axisValuesToSend[axisName] = value;
+                const invertedValue = this.axisInversions[axisName] ? -value : value;
+                axisValuesToSend[axisName] = invertedValue;
 
                 const axisCode = this.getAxisCode(axisName);
                 if (this.axisModifiers[axisCode]) {
@@ -414,6 +421,54 @@ class ExpoJoystickWeb {
 
         this.sendButtonEvent(keyName, keyCode, false)
     }
+
+    setInvertX(inverted: boolean) {
+        this.axisInversions['AXIS_X'] = inverted;
+        this.axisInversions['AXIS_Z'] = inverted;
+    }
+
+    setInvertY(inverted: boolean) {
+        this.axisInversions['AXIS_Y'] = inverted;
+        this.axisInversions['AXIS_RZ'] = inverted;
+    }
+
+    leftStickMove(x: number, y: number) {
+        const invertedX = this.axisInversions['AXIS_X'] ? -x : x;
+        const invertedY = this.axisInversions['AXIS_Y'] ? -y : y;
+
+        const params = {
+            action: 'ACTION_MOVE',
+            modifiers: {},
+            AXIS_X: invertedX,
+            AXIS_Y: invertedY
+        };
+
+        emitter.emit('onJoyStick', params);
+
+        this.sendJsonOverWebSocket({
+            method: 'onJoystick',
+            data: params
+        });
+    }
+
+    rightStickMove(x: number, y: number) {
+        const invertedX = this.axisInversions['AXIS_Z'] ? -x : x;
+        const invertedY = this.axisInversions['AXIS_RZ'] ? -y : y;
+
+        const params = {
+            action: 'ACTION_MOVE',
+            modifiers: {},
+            AXIS_Z: invertedX,
+            AXIS_RZ: invertedY
+        };
+
+        emitter.emit('onJoyStick', params);
+
+        this.sendJsonOverWebSocket({
+            method: 'onJoystick',
+            data: params
+        });
+    }
 }
 
 const instance = new ExpoJoystickWeb();
@@ -432,4 +487,8 @@ export default {
         instance.setAxisDeadzone(motionEvent, deadzone),
     buttonDown: (keyName: string) => instance.buttonDown(keyName),
     buttonUp: (keyName: string) => instance.buttonUp(keyName),
+    setInvertX: (inverted: boolean) => instance.setInvertX(inverted),
+    setInvertY: (inverted: boolean) => instance.setInvertY(inverted),
+    leftStickMove: (x: number, y: number) => instance.leftStickMove(x, y),
+    rightStickMove: (x: number, y: number) => instance.rightStickMove(x, y),
 };

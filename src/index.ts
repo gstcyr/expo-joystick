@@ -55,7 +55,6 @@ export function useWebSocketStatus() {
     return status;
 }
 
-
 export function sendButtonPressOverWebSocket(keyCode, enabled) {
     ExpoJoystickModule.sendButtonPressOverWebSocket(keyCode, enabled)
 }
@@ -80,5 +79,25 @@ export function buttonDown(keyName: string) {
 export function buttonUp(keyName: string) {
     if (ExpoJoystickModule.buttonUp) {
         ExpoJoystickModule.buttonUp(keyName);
+    }
+}
+
+export function setInvertX(inverted: boolean) {
+    ExpoJoystickModule.setInvertX(inverted);
+}
+
+export function setInvertY(inverted: boolean) {
+    ExpoJoystickModule.setInvertY(inverted);
+}
+
+export function leftStickMove(x: number, y: number) {
+    if (ExpoJoystickModule.leftStickMove) {
+        ExpoJoystickModule.leftStickMove(x, y);
+    }
+}
+
+export function rightStickMove(x: number, y: number) {
+    if (ExpoJoystickModule.rightStickMove) {
+        ExpoJoystickModule.rightStickMove(x, y);
     }
 }

@@ -37,6 +37,12 @@ class ExpoJoystickWeb {
     axisModifiers = {};
     deadzoneOverrides = {};
     defaultDeadzone = 0.01;
+    axisInversions = {
+        'AXIS_X': false,
+        'AXIS_Y': false,
+        'AXIS_Z': false,
+        'AXIS_RZ': false
+    };
     pollIntervalMs = 40; // 25 FPS
     lastPollTime = 0;
     lastSentPayload = null;
@@ -111,7 +117,6 @@ class ExpoJoystickWeb {
         this.handleAxisEvent(gamepad);
     }
     handleButtonEvent(buttonIndex, pressed) {
-        console.log("HERE", buttonIndex, pressed);
         const keyCode = BUTTON_MAPPING[buttonIndex];
         if (keyCode === undefined)
             return;
@@ -143,7 +148,8 @@ class ExpoJoystickWeb {
                 return;
             const previousValue = this.lastAxisValues[axisName] || 0;
             if (this.shouldIncludeAxis(axisName, value, previousValue)) {
-                axisValuesToSend[axisName] = value;
+                const invertedValue = this.axisInversions[axisName] ? -value : value;
+                axisValuesToSend[axisName] = invertedValue;
                 const axisCode = this.getAxisCode(axisName);
                 if (this.axisModifiers[axisCode]) {
                     axisModifiersToSend[axisName] = this.axisModifiers[axisCode];
@@ -274,7 +280,6 @@ class ExpoJoystickWeb {
         }
     }
     disconnectWebSocket() {
-        console.log("disconnect");
         if (this.retryTimeout !== null) {
             clearTimeout(this.retryTimeout);
             this.retryTimeout = null;
@@ -296,9 +301,6 @@ class ExpoJoystickWeb {
     }
     getWebSocketStatus() {
         return this.socketState;
-    }
-    testFunction() {
-        return "WEB";
     }
     sendButtonPressOverWebSocket(keyCode, enabled) {
         this.sendOverWsEnabled[keyCode] = enabled;
@@ -332,7 +334,6 @@ class ExpoJoystickWeb {
         return mapping[keyName] || null;
     }
     buttonDown(keyName) {
-        console.log("buttonDown", keyName);
         const keyCode = this.getKeyCodeFromName(keyName);
         if (keyCode === null) {
             console.warn(`Unknown button keyName: ${keyName}`);
@@ -341,13 +342,50 @@ class ExpoJoystickWeb {
         this.sendButtonEvent(keyName, keyCode, true);
     }
     buttonUp(keyName) {
-        console.log("buttonUp", keyName);
         const keyCode = this.getKeyCodeFromName(keyName);
         if (keyCode === null) {
             console.warn(`Unknown button keyName: ${keyName}`);
             return;
         }
-        this.sendButtonEvent(keyName, keyCode, true);
+        this.sendButtonEvent(keyName, keyCode, false);
+    }
+    setInvertX(inverted) {
+        this.axisInversions['AXIS_X'] = inverted;
+        this.axisInversions['AXIS_Z'] = inverted;
+    }
+    setInvertY(inverted) {
+        this.axisInversions['AXIS_Y'] = inverted;
+        this.axisInversions['AXIS_RZ'] = inverted;
+    }
+    leftStickMove(x, y) {
+        const invertedX = this.axisInversions['AXIS_X'] ? -x : x;
+        const invertedY = this.axisInversions['AXIS_Y'] ? -y : y;
+        const params = {
+            action: 'ACTION_MOVE',
+            modifiers: {},
+            AXIS_X: invertedX,
+            AXIS_Y: invertedY
+        };
+        emitter.emit('onJoyStick', params);
+        this.sendJsonOverWebSocket({
+            method: 'onJoystick',
+            data: params
+        });
+    }
+    rightStickMove(x, y) {
+        const invertedX = this.axisInversions['AXIS_Z'] ? -x : x;
+        const invertedY = this.axisInversions['AXIS_RZ'] ? -y : y;
+        const params = {
+            action: 'ACTION_MOVE',
+            modifiers: {},
+            AXIS_Z: invertedX,
+            AXIS_RZ: invertedY
+        };
+        emitter.emit('onJoyStick', params);
+        this.sendJsonOverWebSocket({
+            method: 'onJoystick',
+            data: params
+        });
     }
 }
 const instance = new ExpoJoystickWeb();
@@ -355,12 +393,15 @@ export default {
     connectWebSocket: (ip, port) => instance.connectWebSocket(ip, port),
     disconnectWebSocket: () => instance.disconnectWebSocket(),
     getWebSocketStatus: () => instance.getWebSocketStatus(),
-    testFunction: () => instance.testFunction(),
     sendButtonPressOverWebSocket: (keyCode, enabled) => instance.sendButtonPressOverWebSocket(keyCode, enabled),
     setButtonModifiers: (keyCode, modifiers) => instance.setButtonModifiers(keyCode, modifiers),
     setAxisModifiers: (motionEvent, modifiers) => instance.setAxisModifiers(motionEvent, modifiers),
     setAxisDeadzone: (motionEvent, deadzone) => instance.setAxisDeadzone(motionEvent, deadzone),
     buttonDown: (keyName) => instance.buttonDown(keyName),
     buttonUp: (keyName) => instance.buttonUp(keyName),
+    setInvertX: (inverted) => instance.setInvertX(inverted),
+    setInvertY: (inverted) => instance.setInvertY(inverted),
+    leftStickMove: (x, y) => instance.leftStickMove(x, y),
+    rightStickMove: (x, y) => instance.rightStickMove(x, y),
 };
 //# sourceMappingURL=ExpoJoystickModule.web.js.map

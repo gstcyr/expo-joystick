@@ -8,9 +8,6 @@ export { MotionEvent, KeyEvent, WebSocketStatus } from "./ExpoJoystick.constants
 //export const MotionEvent = ExpoJoystickModule.MotionEvent;
 //export const KeyEvent = ExpoJoystickModule.KeyEvent;
 const emitter = new EventEmitter(ExpoJoystickModule ?? NativeModulesProxy.ExpoJoystick);
-export function testFunction() {
-    return ExpoJoystickModule.testFunction();
-}
 export function onButtonPress(listener) {
     return emitter.addListener('onButtonPress', listener);
 }
@@ -55,15 +52,29 @@ export function setAxisDeadzone(motionEvent, deadZone) {
     ExpoJoystickModule.setAxisDeadzone(motionEvent, deadZone);
 }
 export function buttonDown(keyName) {
-    console.log("BUTTON DOWN");
     if (ExpoJoystickModule.buttonDown) {
         ExpoJoystickModule.buttonDown(keyName);
     }
 }
 export function buttonUp(keyName) {
-    console.log("BUTTON UP");
     if (ExpoJoystickModule.buttonUp) {
         ExpoJoystickModule.buttonUp(keyName);
+    }
+}
+export function setInvertX(inverted) {
+    ExpoJoystickModule.setInvertX(inverted);
+}
+export function setInvertY(inverted) {
+    ExpoJoystickModule.setInvertY(inverted);
+}
+export function leftStickMove(x, y) {
+    if (ExpoJoystickModule.leftStickMove) {
+        ExpoJoystickModule.leftStickMove(x, y);
+    }
+}
+export function rightStickMove(x, y) {
+    if (ExpoJoystickModule.rightStickMove) {
+        ExpoJoystickModule.rightStickMove(x, y);
     }
 }
 //# sourceMappingURL=index.js.map

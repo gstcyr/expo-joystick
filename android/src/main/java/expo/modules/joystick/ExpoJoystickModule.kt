@@ -101,6 +101,14 @@ class ExpoJoystickModule : Module() {
         Function("getWebSocketStatus") {
             socketState.name.lowercase()
         }
+        Function("setInvertX") { inverted: Boolean ->
+            axisInversions["AXIS_X"] = inverted
+            axisInversions["AXIS_Z"] = inverted
+        }
+        Function("setInvertY") { inverted: Boolean ->
+            axisInversions["AXIS_Y"] = inverted
+            axisInversions["AXIS_RZ"] = inverted
+        }
     }
 
     private var lastJoystickDevice: InputDevice? = null
@@ -147,6 +155,12 @@ class ExpoJoystickModule : Module() {
     private val sendOverWsEnabled: MutableMap<Int, Boolean> = validKeyCodes.associateWith { true }.toMutableMap()
     private val buttonModifiers: MutableMap<Int, MutableMap<String, Any>> = mutableMapOf()
     private val axisModifiers: MutableMap<Int, MutableMap<String, Any>> = mutableMapOf()
+    private val axisInversions: MutableMap<String, Boolean> = mutableMapOf(
+        "AXIS_X" to false,
+        "AXIS_Y" to false,
+        "AXIS_Z" to false,
+        "AXIS_RZ" to false
+    )
 
 
     fun <T> getIntConstantName(targetClass: Class<T>, value: Int): String {
@@ -239,7 +253,8 @@ class ExpoJoystickModule : Module() {
                     val previousValue = lastAxisValues[axisName]
 
                     if (shouldIncludeAxis(axisName, currentValue, previousValue)) {
-                        axisValuesToSend[axisName] = currentValue
+                        val invertedValue = if (axisInversions[axisName] == true) -currentValue else currentValue
+                        axisValuesToSend[axisName] = invertedValue
                         axisModifiers[axisCode]?.let { props ->
                             axisModifiersToSend[axisName] = props
                         }

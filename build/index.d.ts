@@ -1,7 +1,6 @@
 import { Subscription } from 'expo-modules-core';
 import { KeyEventPayload, MotionEventPayload } from './ExpoJoystick.types';
 export { MotionEvent, KeyEvent, WebSocketStatus } from "./ExpoJoystick.constants";
-export declare function testFunction(): any;
 export declare function onButtonPress(listener: (event: KeyEventPayload) => void): Subscription;
 export declare function onJoyStick(listener: (event: MotionEventPayload) => void): Subscription;
 export declare function connectWebSocket(ip: any, port: any): void;
@@ -14,4 +13,8 @@ export declare function setAxisModifiers(motionEvent: any, modifiers: any): void
 export declare function setAxisDeadzone(motionEvent: any, deadZone: any): void;
 export declare function buttonDown(keyName: string): void;
 export declare function buttonUp(keyName: string): void;
+export declare function setInvertX(inverted: boolean): void;
+export declare function setInvertY(inverted: boolean): void;
+export declare function leftStickMove(x: number, y: number): void;
+export declare function rightStickMove(x: number, y: number): void;
 //# sourceMappingURL=index.d.ts.map
