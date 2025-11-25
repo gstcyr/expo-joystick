@@ -28,7 +28,9 @@
   "author": " Gilles St-Cyr <gstcyr@gmail.com> (https://github.com/gstcyr)",
   "license": "MIT",
   "homepage": "https://github.com/gstcyr/expo-joystick#readme",
-  "dependencies": {},
+  "dependencies": {
+    "yarn": "^1.22.22"
+  },
   "devDependencies": {
     "@types/react": "^18.0.25",
     "expo-module-scripts": "^3.5.2",

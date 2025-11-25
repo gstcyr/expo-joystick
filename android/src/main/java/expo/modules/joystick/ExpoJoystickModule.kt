@@ -94,8 +94,20 @@ class ExpoJoystickModule : Module() {
         Function("setAxisModifiers") { motionEvent: Int, modifiers: Map<String, Any> ->
             axisModifiers[motionEvent] = modifiers.toMutableMap();
         }
+        Function("setAxisDeadzone") { motionEvent: Int, deadZone: Float ->
+            val axisName = getAxisName(motionEvent)
+            deadzoneOverrides[axisName] = deadZone;
+        }
         Function("getWebSocketStatus") {
             socketState.name.lowercase()
+        }
+        Function("setInvertX") { inverted: Boolean ->
+            axisInversions["AXIS_X"] = inverted
+            axisInversions["AXIS_Z"] = inverted
+        }
+        Function("setInvertY") { inverted: Boolean ->
+            axisInversions["AXIS_Y"] = inverted
+            axisInversions["AXIS_RZ"] = inverted
         }
     }
 
@@ -114,7 +126,7 @@ class ExpoJoystickModule : Module() {
     private val pollThread = HandlerThread("JoystickPoller").apply {start() } //Handler(Looper.getMainLooper())
     private val handler = Handler(pollThread.looper)
     private var isPolling = false
-    private val pollIntervalMs = 16L  // 25 FPS
+    private val pollIntervalMs = 16L  // 62.5 FPS
 
     // --- WebSocket Support ---
     private var webSocket: WebSocket? = null
@@ -143,6 +155,12 @@ class ExpoJoystickModule : Module() {
     private val sendOverWsEnabled: MutableMap<Int, Boolean> = validKeyCodes.associateWith { true }.toMutableMap()
     private val buttonModifiers: MutableMap<Int, MutableMap<String, Any>> = mutableMapOf()
     private val axisModifiers: MutableMap<Int, MutableMap<String, Any>> = mutableMapOf()
+    private val axisInversions: MutableMap<String, Boolean> = mutableMapOf(
+        "AXIS_X" to false,
+        "AXIS_Y" to false,
+        "AXIS_Z" to false,
+        "AXIS_RZ" to false
+    )
 
 
     fun <T> getIntConstantName(targetClass: Class<T>, value: Int): String {
@@ -235,7 +253,8 @@ class ExpoJoystickModule : Module() {
                     val previousValue = lastAxisValues[axisName]
 
                     if (shouldIncludeAxis(axisName, currentValue, previousValue)) {
-                        axisValuesToSend[axisName] = currentValue
+                        val invertedValue = if (axisInversions[axisName] == true) -currentValue else currentValue
+                        axisValuesToSend[axisName] = invertedValue
                         axisModifiers[axisCode]?.let { props ->
                             axisModifiersToSend[axisName] = props
                         }

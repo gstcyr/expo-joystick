@@ -1,5 +1,4 @@
 import {useState} from 'react';
-import {Platform} from 'react-native';
 import { NativeModulesProxy, EventEmitter, Subscription } from 'expo-modules-core';
 
 // Import the native module. On web, it will be resolved to ExpoJoystick.web.ts
@@ -47,7 +46,6 @@ type WebSocketStatusEvent = {
 };
 
 export function useWebSocketStatus() {
-    if(Platform.OS !== 'android') return "disabled";
 
     const [status, setStatus] = useState(getWebSocketStatus());
     const sub = emitter.addListener("websocketStatus", ({status, error}: WebSocketStatusEvent) => {
@@ -56,7 +54,6 @@ export function useWebSocketStatus() {
     })
     return status;
 }
-
 
 export function sendButtonPressOverWebSocket(keyCode, enabled) {
     ExpoJoystickModule.sendButtonPressOverWebSocket(keyCode, enabled)
@@ -68,4 +65,39 @@ export function setButtonModifiers(keyCode, modifiers) {
 
 export function setAxisModifiers(motionEvent, modifiers) {
     ExpoJoystickModule.setAxisModifiers(motionEvent, modifiers);
+}
+export function setAxisDeadzone(motionEvent, deadZone) {
+    ExpoJoystickModule.setAxisDeadzone(motionEvent, deadZone);
+}
+
+export function buttonDown(keyName: string) {
+    if (ExpoJoystickModule.buttonDown) {
+        ExpoJoystickModule.buttonDown(keyName);
+    }
+}
+
+export function buttonUp(keyName: string) {
+    if (ExpoJoystickModule.buttonUp) {
+        ExpoJoystickModule.buttonUp(keyName);
+    }
+}
+
+export function setInvertX(inverted: boolean) {
+    ExpoJoystickModule.setInvertX(inverted);
+}
+
+export function setInvertY(inverted: boolean) {
+    ExpoJoystickModule.setInvertY(inverted);
+}
+
+export function leftStickMove(x: number, y: number) {
+    if (ExpoJoystickModule.leftStickMove) {
+        ExpoJoystickModule.leftStickMove(x, y);
+    }
+}
+
+export function rightStickMove(x: number, y: number) {
+    if (ExpoJoystickModule.rightStickMove) {
+        ExpoJoystickModule.rightStickMove(x, y);
+    }
 }
