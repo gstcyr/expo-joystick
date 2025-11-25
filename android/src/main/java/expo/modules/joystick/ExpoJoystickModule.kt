@@ -275,6 +275,20 @@ class ExpoJoystickModule : Module() {
 
     private fun stopJoystickPolling() {
         isPolling = false
+        if (lastSentPayload != null) {
+            val zeroPayload = (lastSentPayload as Map<out Any?, Any?>).toMutableMap().apply {
+                entries.forEach { (k, v) ->
+                    if (v is Float) {
+                        this[k] = 0f
+                    }
+                }
+                put("delta", 0)
+            }
+            sendJsonOverWebSocket(mapOf(
+                "method" to "onJoystick",
+                "data" to zeroPayload
+            ))
+        }
         handler.removeCallbacks(pollRunnable)
     }
 
