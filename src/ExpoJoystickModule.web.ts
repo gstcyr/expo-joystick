@@ -422,14 +422,15 @@ class ExpoJoystickWeb {
         this.sendButtonEvent(keyName, keyCode, false)
     }
 
-    setInvertX(inverted: boolean) {
-        this.axisInversions['AXIS_X'] = inverted;
-        this.axisInversions['AXIS_Z'] = inverted;
-    }
+    setJoystickInversion(motionEvent: number, inverted: boolean) {
+        const axisName = Object.keys(AXIS_NAMES).find(
+            key => this.getAxisCode(AXIS_NAMES[parseInt(key) as keyof typeof AXIS_NAMES]) === motionEvent
+        );
 
-    setInvertY(inverted: boolean) {
-        this.axisInversions['AXIS_Y'] = inverted;
-        this.axisInversions['AXIS_RZ'] = inverted;
+        if (axisName) {
+            const name = AXIS_NAMES[parseInt(axisName) as keyof typeof AXIS_NAMES];
+            this.axisInversions[name] = inverted;
+        }
     }
 
     leftStickMove(x: number, y: number) {
@@ -487,8 +488,8 @@ export default {
         instance.setAxisDeadzone(motionEvent, deadzone),
     buttonDown: (keyName: string) => instance.buttonDown(keyName),
     buttonUp: (keyName: string) => instance.buttonUp(keyName),
-    setInvertX: (inverted: boolean) => instance.setInvertX(inverted),
-    setInvertY: (inverted: boolean) => instance.setInvertY(inverted),
+    setJoystickInversion: (motionEvent: number, inverted: boolean) =>
+        instance.setJoystickInversion(motionEvent, inverted),
     leftStickMove: (x: number, y: number) => instance.leftStickMove(x, y),
     rightStickMove: (x: number, y: number) => instance.rightStickMove(x, y),
 };

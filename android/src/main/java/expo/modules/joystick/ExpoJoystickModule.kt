@@ -101,13 +101,21 @@ class ExpoJoystickModule : Module() {
         Function("getWebSocketStatus") {
             socketState.name.lowercase()
         }
-        Function("setInvertX") { inverted: Boolean ->
-            axisInversions["AXIS_X"] = inverted
-            axisInversions["AXIS_Z"] = inverted
+        Function("setJoystickInversion") { motionEvent: Int, inverted: Boolean ->
+            val axisName = getAxisName(motionEvent)
+            axisInversions[axisName] = inverted
         }
-        Function("setInvertY") { inverted: Boolean ->
-            axisInversions["AXIS_Y"] = inverted
-            axisInversions["AXIS_RZ"] = inverted
+        Function("buttonDown") { keyName: String ->
+            buttonDown(keyName)
+        }
+        Function("buttonUp") { keyName: String ->
+            buttonUp(keyName)
+        }
+        Function("leftStickMove") { x: Double, y: Double ->
+            leftStickMove(x.toFloat(), y.toFloat())
+        }
+        Function("rightStickMove") { x: Double, y: Double ->
+            rightStickMove(x.toFloat(), y.toFloat())
         }
     }
 
@@ -412,6 +420,142 @@ class ExpoJoystickModule : Module() {
             activity.window.callback = originalCallback
         }
         //activity = null
+    }
+
+    private fun getKeyCodeFromName(keyName: String): Int? {
+        return when (keyName) {
+            "KEYCODE_BUTTON_A" -> KeyEvent.KEYCODE_BUTTON_A
+            "KEYCODE_BUTTON_B" -> KeyEvent.KEYCODE_BUTTON_B
+            "KEYCODE_BUTTON_L1" -> KeyEvent.KEYCODE_BUTTON_L1
+            "KEYCODE_BUTTON_R1" -> KeyEvent.KEYCODE_BUTTON_R1
+            "KEYCODE_BUTTON_L2" -> KeyEvent.KEYCODE_BUTTON_L2
+            "KEYCODE_BUTTON_R2" -> KeyEvent.KEYCODE_BUTTON_R2
+            "KEYCODE_BUTTON_THUMBL" -> KeyEvent.KEYCODE_BUTTON_THUMBL
+            "KEYCODE_BUTTON_THUMBR" -> KeyEvent.KEYCODE_BUTTON_THUMBR
+            "KEYCODE_BUTTON_START" -> KeyEvent.KEYCODE_BUTTON_START
+            "KEYCODE_BUTTON_SELECT" -> KeyEvent.KEYCODE_BUTTON_SELECT
+            else -> null
+        }
+    }
+
+    private fun sendButtonEvent(keyName: String, keyCode: Int, pressed: Boolean) {
+        val action = if (pressed) "ACTION_DOWN" else "ACTION_UP"
+
+        val params = mapOf(
+            "action" to action,
+            "keyCode" to keyCode,
+            "keyName" to keyName,
+            "modifiers" to (buttonModifiers[keyCode] ?: emptyMap<String, Any>())
+        )
+
+        sendEvent("onButtonPress", params)
+
+        if (sendOverWsEnabled[keyCode] == true) {
+            sendJsonOverWebSocket(
+                mapOf(
+                    "method" to "onButtonPress",
+                    "data" to params
+                )
+            )
+        }
+    }
+
+    private fun buttonDown(keyName: String) {
+        val keyCode = getKeyCodeFromName(keyName)
+        if (keyCode == null) {
+            Log.w("expo-joystick", "Unknown button keyName: $keyName")
+            return
+        }
+
+        sendButtonEvent(keyName, keyCode, true)
+    }
+
+    private fun buttonUp(keyName: String) {
+        val keyCode = getKeyCodeFromName(keyName)
+        if (keyCode == null) {
+            Log.w("expo-joystick", "Unknown button keyName: $keyName")
+            return
+        }
+
+        sendButtonEvent(keyName, keyCode, false)
+    }
+
+    private fun leftStickMove(x: Float, y: Float) {
+        val invertedX = if (axisInversions["AXIS_X"] == true) -x else x
+        val invertedY = if (axisInversions["AXIS_Y"] == true) -y else y
+
+        val axisModifiersToSend = mutableMapOf<String, Map<String, Any>>()
+        axisModifiers[MotionEvent.AXIS_X]?.let { props ->
+            axisModifiersToSend["AXIS_X"] = props
+        }
+        axisModifiers[MotionEvent.AXIS_Y]?.let { props ->
+            axisModifiersToSend["AXIS_Y"] = props
+        }
+
+        val params = mutableMapOf<String, Any?>(
+            "action" to "ACTION_MOVE",
+            "modifiers" to axisModifiersToSend,
+            "AXIS_X" to invertedX,
+            "AXIS_Y" to invertedY
+        )
+
+        lastSentPayload = HashMap(params)
+        sendEvent("onJoyStick", params)
+
+        sendJsonOverWebSocket(
+            mapOf(
+                "method" to "onJoystick",
+                "data" to params
+            )
+        )
+
+        // Update last axis values to track state
+        lastAxisValues["AXIS_X"] = x
+        lastAxisValues["AXIS_Y"] = y
+
+        // Start polling if there's movement
+        if (x.absoluteValue > defaultDeadzone || y.absoluteValue > defaultDeadzone) {
+            lastJoystickDevice?.let { startJoystickPolling(it) }
+        }
+    }
+
+    private fun rightStickMove(x: Float, y: Float) {
+        val invertedX = if (axisInversions["AXIS_Z"] == true) -x else x
+        val invertedY = if (axisInversions["AXIS_RZ"] == true) -y else y
+
+        val axisModifiersToSend = mutableMapOf<String, Map<String, Any>>()
+        axisModifiers[MotionEvent.AXIS_Z]?.let { props ->
+            axisModifiersToSend["AXIS_Z"] = props
+        }
+        axisModifiers[MotionEvent.AXIS_RZ]?.let { props ->
+            axisModifiersToSend["AXIS_RZ"] = props
+        }
+
+        val params = mutableMapOf<String, Any?>(
+            "action" to "ACTION_MOVE",
+            "modifiers" to axisModifiersToSend,
+            "AXIS_Z" to invertedX,
+            "AXIS_RZ" to invertedY
+        )
+
+        lastSentPayload = HashMap(params)
+        sendEvent("onJoyStick", params)
+
+        sendJsonOverWebSocket(
+            mapOf(
+                "method" to "onJoystick",
+                "data" to params
+            )
+        )
+
+        // Update last axis values to track state
+        lastAxisValues["AXIS_Z"] = x
+        lastAxisValues["AXIS_RZ"] = y
+
+        // Start polling if there's movement
+        if (x.absoluteValue > defaultDeadzone || y.absoluteValue > defaultDeadzone) {
+            lastJoystickDevice?.let { startJoystickPolling(it) }
+        }
     }
 
 }

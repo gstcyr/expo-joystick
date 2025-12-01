@@ -12,8 +12,7 @@ declare const _default: {
     setAxisDeadzone: (motionEvent: number, deadzone: number) => void;
     buttonDown: (keyName: string) => void;
     buttonUp: (keyName: string) => void;
-    setInvertX: (inverted: boolean) => void;
-    setInvertY: (inverted: boolean) => void;
+    setJoystickInversion: (motionEvent: number, inverted: boolean) => void;
     leftStickMove: (x: number, y: number) => void;
     rightStickMove: (x: number, y: number) => void;
 };

@@ -52,29 +52,18 @@ export function setAxisDeadzone(motionEvent, deadZone) {
     ExpoJoystickModule.setAxisDeadzone(motionEvent, deadZone);
 }
 export function buttonDown(keyName) {
-    if (ExpoJoystickModule.buttonDown) {
-        ExpoJoystickModule.buttonDown(keyName);
-    }
+    ExpoJoystickModule.buttonDown(keyName);
 }
 export function buttonUp(keyName) {
-    if (ExpoJoystickModule.buttonUp) {
-        ExpoJoystickModule.buttonUp(keyName);
-    }
+    ExpoJoystickModule.buttonUp(keyName);
 }
-export function setInvertX(inverted) {
-    ExpoJoystickModule.setInvertX(inverted);
-}
-export function setInvertY(inverted) {
-    ExpoJoystickModule.setInvertY(inverted);
+export function setJoystickInversion(motionEvent, inverted) {
+    ExpoJoystickModule.setJoystickInversion(motionEvent, inverted);
 }
 export function leftStickMove(x, y) {
-    if (ExpoJoystickModule.leftStickMove) {
-        ExpoJoystickModule.leftStickMove(x, y);
-    }
+    ExpoJoystickModule.leftStickMove(x, y);
 }
 export function rightStickMove(x, y) {
-    if (ExpoJoystickModule.rightStickMove) {
-        ExpoJoystickModule.rightStickMove(x, y);
-    }
+    ExpoJoystickModule.rightStickMove(x, y);
 }
 //# sourceMappingURL=index.js.map
