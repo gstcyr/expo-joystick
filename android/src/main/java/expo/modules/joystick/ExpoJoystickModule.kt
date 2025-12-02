@@ -94,8 +94,30 @@ class ExpoJoystickModule : Module() {
         Function("setAxisModifiers") { motionEvent: Int, modifiers: Map<String, Any> ->
             axisModifiers[motionEvent] = modifiers.toMutableMap();
         }
+        Function("setAxisDeadzone") { motionEvent: Int, deadZone: Float ->
+            val axisName = getAxisName(motionEvent)
+            deadzoneOverrides[axisName] = deadZone;
+
+            resendCurrentJoystickState()
+        }
         Function("getWebSocketStatus") {
             socketState.name.lowercase()
+        }
+        Function("setJoystickInversion") { motionEvent: Int, inverted: Boolean ->
+            val axisName = getAxisName(motionEvent)
+            axisInversions[axisName] = inverted
+        }
+        Function("buttonDown") { keyName: String ->
+            buttonDown(keyName)
+        }
+        Function("buttonUp") { keyName: String ->
+            buttonUp(keyName)
+        }
+        Function("leftStickMove") { x: Double, y: Double ->
+            leftStickMove(x.toFloat(), y.toFloat())
+        }
+        Function("rightStickMove") { x: Double, y: Double ->
+            rightStickMove(x.toFloat(), y.toFloat())
         }
     }
 
@@ -114,7 +136,7 @@ class ExpoJoystickModule : Module() {
     private val pollThread = HandlerThread("JoystickPoller").apply {start() } //Handler(Looper.getMainLooper())
     private val handler = Handler(pollThread.looper)
     private var isPolling = false
-    private val pollIntervalMs = 16L  // 25 FPS
+    private val pollIntervalMs = 16L  // 62.5 FPS
 
     // --- WebSocket Support ---
     private var webSocket: WebSocket? = null
@@ -143,6 +165,12 @@ class ExpoJoystickModule : Module() {
     private val sendOverWsEnabled: MutableMap<Int, Boolean> = validKeyCodes.associateWith { true }.toMutableMap()
     private val buttonModifiers: MutableMap<Int, MutableMap<String, Any>> = mutableMapOf()
     private val axisModifiers: MutableMap<Int, MutableMap<String, Any>> = mutableMapOf()
+    private val axisInversions: MutableMap<String, Boolean> = mutableMapOf(
+        "AXIS_X" to false,
+        "AXIS_Y" to false,
+        "AXIS_Z" to false,
+        "AXIS_RZ" to false
+    )
 
 
     fun <T> getIntConstantName(targetClass: Class<T>, value: Int): String {
@@ -204,6 +232,62 @@ class ExpoJoystickModule : Module() {
             }?.name ?: "AXIS_$value"
     }
 
+    private fun getAxisCodeFromName(axisName: String): Int? {
+        return MotionEvent::class.java.fields
+            .firstOrNull { field ->
+                field.type == Int::class.java &&
+                        field.name == axisName
+            }?.getInt(null)
+    }
+
+    private fun buildAndSendJoystickState(axisValuesToSend: Map<String, Float>, action: String = "ACTION_MOVE") {
+        val axisModifiersToSend = mutableMapOf<String, Map<String, Any>>()
+
+        for (axisName in axisValuesToSend.keys) {
+            val axisCode = getAxisCodeFromName(axisName)
+            axisCode?.let { code ->
+                axisModifiers[code]?.let { props ->
+                    axisModifiersToSend[axisName] = props
+                }
+            }
+        }
+
+        val params = mutableMapOf<String, Any?>(
+            "action" to action,
+            "modifiers" to axisModifiersToSend,
+        )
+        params.putAll(axisValuesToSend)
+
+        lastSentPayload = HashMap(params)
+        sendEvent("onJoyStick", params)
+        sendJsonOverWebSocket(
+            mapOf(
+                "method" to "onJoystick",
+                "data" to params
+            )
+        )
+    }
+
+    private fun resendCurrentJoystickState() {
+        if (lastAxisValues.isEmpty()) return
+
+        val axisValuesToSend = mutableMapOf<String, Float>()
+
+        for ((axisName, rawValue) in lastAxisValues) {
+            val deadzone = deadzoneOverrides[axisName] ?: defaultDeadzone
+
+            val valueToSend = if (rawValue.absoluteValue <= deadzone) {
+                0f
+            } else {
+                if (axisInversions[axisName] == true) -rawValue else rawValue
+            }
+
+            axisValuesToSend[axisName] = valueToSend
+        }
+
+        buildAndSendJoystickState(axisValuesToSend)
+    }
+
     private fun registerInputListeners(activity: Activity) {
 
         originalCallback = activity.window.callback
@@ -235,7 +319,8 @@ class ExpoJoystickModule : Module() {
                     val previousValue = lastAxisValues[axisName]
 
                     if (shouldIncludeAxis(axisName, currentValue, previousValue)) {
-                        axisValuesToSend[axisName] = currentValue
+                        val invertedValue = if (axisInversions[axisName] == true) -currentValue else currentValue
+                        axisValuesToSend[axisName] = invertedValue
                         axisModifiers[axisCode]?.let { props ->
                             axisModifiersToSend[axisName] = props
                         }
@@ -407,6 +492,106 @@ class ExpoJoystickModule : Module() {
             activity.window.callback = originalCallback
         }
         //activity = null
+    }
+
+    private fun getKeyCodeFromName(keyName: String): Int? {
+        return when (keyName) {
+            "KEYCODE_BUTTON_A" -> KeyEvent.KEYCODE_BUTTON_A
+            "KEYCODE_BUTTON_B" -> KeyEvent.KEYCODE_BUTTON_B
+            "KEYCODE_BUTTON_L1" -> KeyEvent.KEYCODE_BUTTON_L1
+            "KEYCODE_BUTTON_R1" -> KeyEvent.KEYCODE_BUTTON_R1
+            "KEYCODE_BUTTON_L2" -> KeyEvent.KEYCODE_BUTTON_L2
+            "KEYCODE_BUTTON_R2" -> KeyEvent.KEYCODE_BUTTON_R2
+            "KEYCODE_BUTTON_THUMBL" -> KeyEvent.KEYCODE_BUTTON_THUMBL
+            "KEYCODE_BUTTON_THUMBR" -> KeyEvent.KEYCODE_BUTTON_THUMBR
+            "KEYCODE_BUTTON_START" -> KeyEvent.KEYCODE_BUTTON_START
+            "KEYCODE_BUTTON_SELECT" -> KeyEvent.KEYCODE_BUTTON_SELECT
+            else -> null
+        }
+    }
+
+    private fun sendButtonEvent(keyName: String, keyCode: Int, pressed: Boolean) {
+        val action = if (pressed) "ACTION_DOWN" else "ACTION_UP"
+
+        val params = mapOf(
+            "action" to action,
+            "keyCode" to keyCode,
+            "keyName" to keyName,
+            "modifiers" to (buttonModifiers[keyCode] ?: emptyMap<String, Any>())
+        )
+
+        sendEvent("onButtonPress", params)
+
+        if (sendOverWsEnabled[keyCode] == true) {
+            sendJsonOverWebSocket(
+                mapOf(
+                    "method" to "onButtonPress",
+                    "data" to params
+                )
+            )
+        }
+    }
+
+    private fun buttonDown(keyName: String) {
+        val keyCode = getKeyCodeFromName(keyName)
+        if (keyCode == null) {
+            Log.w("expo-joystick", "Unknown button keyName: $keyName")
+            return
+        }
+
+        sendButtonEvent(keyName, keyCode, true)
+    }
+
+    private fun buttonUp(keyName: String) {
+        val keyCode = getKeyCodeFromName(keyName)
+        if (keyCode == null) {
+            Log.w("expo-joystick", "Unknown button keyName: $keyName")
+            return
+        }
+
+        sendButtonEvent(keyName, keyCode, false)
+    }
+
+    private fun leftStickMove(x: Float, y: Float) {
+        val invertedX = if (axisInversions["AXIS_X"] == true) -x else x
+        val invertedY = if (axisInversions["AXIS_Y"] == true) -y else y
+
+        val axisValuesToSend = mapOf(
+            "AXIS_X" to invertedX,
+            "AXIS_Y" to invertedY
+        )
+
+        buildAndSendJoystickState(axisValuesToSend)
+
+        // Update last axis values to track state
+        lastAxisValues["AXIS_X"] = x
+        lastAxisValues["AXIS_Y"] = y
+
+        // Start polling if there's movement
+        if (x.absoluteValue > defaultDeadzone || y.absoluteValue > defaultDeadzone) {
+            lastJoystickDevice?.let { startJoystickPolling(it) }
+        }
+    }
+
+    private fun rightStickMove(x: Float, y: Float) {
+        val invertedX = if (axisInversions["AXIS_Z"] == true) -x else x
+        val invertedY = if (axisInversions["AXIS_RZ"] == true) -y else y
+
+        val axisValuesToSend = mapOf(
+            "AXIS_Z" to invertedX,
+            "AXIS_RZ" to invertedY
+        )
+
+        buildAndSendJoystickState(axisValuesToSend)
+
+        // Update last axis values to track state
+        lastAxisValues["AXIS_Z"] = x
+        lastAxisValues["AXIS_RZ"] = y
+
+        // Start polling if there's movement
+        if (x.absoluteValue > defaultDeadzone || y.absoluteValue > defaultDeadzone) {
+            lastJoystickDevice?.let { startJoystickPolling(it) }
+        }
     }
 
 }

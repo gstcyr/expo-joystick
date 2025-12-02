@@ -1,1 +1,1 @@
-{"version":3,"file":"ExpoJoystickModule.web.d.ts","sourceRoot":"","sources":["../src/ExpoJoystickModule.web.ts"],"names":[],"mappings":";AAIA,wBAEE"}
+{"version":3,"file":"ExpoJoystickModule.web.d.ts","sourceRoot":"","sources":["../src/ExpoJoystickModule.web.ts"],"names":[],"mappings":";2BA2f2B,MAAM,QAAQ,MAAM;;;4CAGH,MAAM,WAAW,OAAO;kCAElC,MAAM;;;oCAEJ,MAAM;;;mCAEP,MAAM,YAAY,MAAM;0BAEjC,MAAM;wBACR,MAAM;wCACU,MAAM,YAAY,OAAO;uBAE1C,MAAM,KAAK,MAAM;wBAChB,MAAM,KAAK,MAAM;;AAjBzC,wBAkBE"}

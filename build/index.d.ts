@@ -10,4 +10,10 @@ export declare function useWebSocketStatus(): any;
 export declare function sendButtonPressOverWebSocket(keyCode: any, enabled: any): void;
 export declare function setButtonModifiers(keyCode: any, modifiers: any): void;
 export declare function setAxisModifiers(motionEvent: any, modifiers: any): void;
+export declare function setAxisDeadzone(motionEvent: any, deadZone: any): void;
+export declare function buttonDown(keyName: string): void;
+export declare function buttonUp(keyName: string): void;
+export declare function setJoystickInversion(motionEvent: number, inverted: boolean): void;
+export declare function leftStickMove(x: number, y: number): void;
+export declare function rightStickMove(x: number, y: number): void;
 //# sourceMappingURL=index.d.ts.map
