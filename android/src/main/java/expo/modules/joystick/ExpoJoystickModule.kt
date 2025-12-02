@@ -97,6 +97,8 @@ class ExpoJoystickModule : Module() {
         Function("setAxisDeadzone") { motionEvent: Int, deadZone: Float ->
             val axisName = getAxisName(motionEvent)
             deadzoneOverrides[axisName] = deadZone;
+
+            resendCurrentJoystickState()
         }
         Function("getWebSocketStatus") {
             socketState.name.lowercase()
@@ -228,6 +230,62 @@ class ExpoJoystickModule : Module() {
                         field.name.startsWith("AXIS_") &&
                         field.getInt(null) == value
             }?.name ?: "AXIS_$value"
+    }
+
+    private fun getAxisCodeFromName(axisName: String): Int? {
+        return MotionEvent::class.java.fields
+            .firstOrNull { field ->
+                field.type == Int::class.java &&
+                        field.name == axisName
+            }?.getInt(null)
+    }
+
+    private fun buildAndSendJoystickState(axisValuesToSend: Map<String, Float>, action: String = "ACTION_MOVE") {
+        val axisModifiersToSend = mutableMapOf<String, Map<String, Any>>()
+
+        for (axisName in axisValuesToSend.keys) {
+            val axisCode = getAxisCodeFromName(axisName)
+            axisCode?.let { code ->
+                axisModifiers[code]?.let { props ->
+                    axisModifiersToSend[axisName] = props
+                }
+            }
+        }
+
+        val params = mutableMapOf<String, Any?>(
+            "action" to action,
+            "modifiers" to axisModifiersToSend,
+        )
+        params.putAll(axisValuesToSend)
+
+        lastSentPayload = HashMap(params)
+        sendEvent("onJoyStick", params)
+        sendJsonOverWebSocket(
+            mapOf(
+                "method" to "onJoystick",
+                "data" to params
+            )
+        )
+    }
+
+    private fun resendCurrentJoystickState() {
+        if (lastAxisValues.isEmpty()) return
+
+        val axisValuesToSend = mutableMapOf<String, Float>()
+
+        for ((axisName, rawValue) in lastAxisValues) {
+            val deadzone = deadzoneOverrides[axisName] ?: defaultDeadzone
+
+            val valueToSend = if (rawValue.absoluteValue <= deadzone) {
+                0f
+            } else {
+                if (axisInversions[axisName] == true) -rawValue else rawValue
+            }
+
+            axisValuesToSend[axisName] = valueToSend
+        }
+
+        buildAndSendJoystickState(axisValuesToSend)
     }
 
     private fun registerInputListeners(activity: Activity) {
@@ -484,30 +542,12 @@ class ExpoJoystickModule : Module() {
         val invertedX = if (axisInversions["AXIS_X"] == true) -x else x
         val invertedY = if (axisInversions["AXIS_Y"] == true) -y else y
 
-        val axisModifiersToSend = mutableMapOf<String, Map<String, Any>>()
-        axisModifiers[MotionEvent.AXIS_X]?.let { props ->
-            axisModifiersToSend["AXIS_X"] = props
-        }
-        axisModifiers[MotionEvent.AXIS_Y]?.let { props ->
-            axisModifiersToSend["AXIS_Y"] = props
-        }
-
-        val params = mutableMapOf<String, Any?>(
-            "action" to "ACTION_MOVE",
-            "modifiers" to axisModifiersToSend,
+        val axisValuesToSend = mapOf(
             "AXIS_X" to invertedX,
             "AXIS_Y" to invertedY
         )
 
-        lastSentPayload = HashMap(params)
-        sendEvent("onJoyStick", params)
-
-        sendJsonOverWebSocket(
-            mapOf(
-                "method" to "onJoystick",
-                "data" to params
-            )
-        )
+        buildAndSendJoystickState(axisValuesToSend)
 
         // Update last axis values to track state
         lastAxisValues["AXIS_X"] = x
@@ -523,30 +563,12 @@ class ExpoJoystickModule : Module() {
         val invertedX = if (axisInversions["AXIS_Z"] == true) -x else x
         val invertedY = if (axisInversions["AXIS_RZ"] == true) -y else y
 
-        val axisModifiersToSend = mutableMapOf<String, Map<String, Any>>()
-        axisModifiers[MotionEvent.AXIS_Z]?.let { props ->
-            axisModifiersToSend["AXIS_Z"] = props
-        }
-        axisModifiers[MotionEvent.AXIS_RZ]?.let { props ->
-            axisModifiersToSend["AXIS_RZ"] = props
-        }
-
-        val params = mutableMapOf<String, Any?>(
-            "action" to "ACTION_MOVE",
-            "modifiers" to axisModifiersToSend,
+        val axisValuesToSend = mapOf(
             "AXIS_Z" to invertedX,
             "AXIS_RZ" to invertedY
         )
 
-        lastSentPayload = HashMap(params)
-        sendEvent("onJoyStick", params)
-
-        sendJsonOverWebSocket(
-            mapOf(
-                "method" to "onJoystick",
-                "data" to params
-            )
-        )
+        buildAndSendJoystickState(axisValuesToSend)
 
         // Update last axis values to track state
         lastAxisValues["AXIS_Z"] = x
