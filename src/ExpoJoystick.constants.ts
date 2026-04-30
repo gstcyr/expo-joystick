@@ -11,6 +11,15 @@ export const MotionEvent = {
   ACTION_MOVE: 2,
 } as const;
 
+
+export const AnalogInput = {
+  LEFT_STICK: "LEFT_STICK",
+  RIGHT_STICK: "RIGHT_STICK",
+  DPAD: "DPAD",
+  LEFT_TRIGGER: "LEFT_TRIGGER",
+  RIGHT_TRIGGER: "RIGHT_TRIGGER"
+} as const;
+
 export const KeyEvent = {
   BUTTON_A: 96,
   BUTTON_B: 97,
@@ -22,6 +31,8 @@ export const KeyEvent = {
   ACTION_UP: 1,
   ACTION_DOWN: 0,
 } as const;
+
+
 
 export const WebSocketStatus = {
     DISCONNECTED: 'disconnected',

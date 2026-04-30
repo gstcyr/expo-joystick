@@ -10,6 +10,13 @@ export declare const MotionEvent: {
     readonly AXIS_SCROLL: 8;
     readonly ACTION_MOVE: 2;
 };
+export declare const AnalogInput: {
+    readonly LEFT_STICK: "LEFT_STICK";
+    readonly RIGHT_STICK: "RIGHT_STICK";
+    readonly DPAD: "DPAD";
+    readonly LEFT_TRIGGER: "LEFT_TRIGGER";
+    readonly RIGHT_TRIGGER: "RIGHT_TRIGGER";
+};
 export declare const KeyEvent: {
     readonly BUTTON_A: 96;
     readonly BUTTON_B: 97;

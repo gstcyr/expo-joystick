@@ -10,6 +10,13 @@ export const MotionEvent = {
     AXIS_SCROLL: 8,
     ACTION_MOVE: 2,
 };
+export const AnalogInput = {
+    LEFT_STICK: "LEFT_STICK",
+    RIGHT_STICK: "RIGHT_STICK",
+    DPAD: "DPAD",
+    LEFT_TRIGGER: "LEFT_TRIGGER",
+    RIGHT_TRIGGER: "RIGHT_TRIGGER"
+};
 export const KeyEvent = {
     BUTTON_A: 96,
     BUTTON_B: 97,

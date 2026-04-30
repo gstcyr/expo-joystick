@@ -1,3 +1,4 @@
+import { AnalogInput, KeyEvent, MotionEvent } from "./ExpoJoystick.constants";
 export declare type MotionEventPayload2 = {
     action: string;
     AXIS_HAT_X: number;
@@ -21,4 +22,7 @@ export declare type KeyEventPayload = {
     keyCode: number;
     keyName: string;
 };
+export declare type MotionEventLabel = typeof MotionEvent[keyof typeof MotionEvent];
+export declare type AnalogInputLabel = typeof AnalogInput[keyof typeof AnalogInput];
+export declare type KeyEventLabel = typeof KeyEvent[keyof typeof KeyEvent];
 //# sourceMappingURL=ExpoJoystick.types.d.ts.map
